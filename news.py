@@ -1,20 +1,23 @@
+ import asyncio
 import aiohttp
 import feedparser
 import re
-import time
+import html
 
 
 # ============================================================
-# RSS SOURCES
+# NEWS SOURCES
 # ============================================================
 
 RSS_FEEDS = {
     "CNBC": [
         "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+        "https://www.cnbc.com/id/15839135/device/rss/rss.html",
     ],
 
     "MarketWatch": [
         "https://feeds.marketwatch.com/marketwatch/topstories/",
+        "https://feeds.marketwatch.com/marketwatch/marketpulse/",
     ],
 }
 
@@ -24,89 +27,96 @@ RSS_FEEDS = {
 # ============================================================
 
 KEYWORDS = {
-    # GOLD
+
+    # GOLD / XAUUSD
     "gold": 100,
-    "xauusd": 120,
+    "xauusd": 140,
+    "gold price": 110,
+    "gold prices": 110,
+    "gold futures": 100,
     "bullion": 80,
-    "gold price": 100,
-    "gold prices": 100,
 
     # FED
     "federal reserve": 120,
+    "fomc": 130,
     "fed": 80,
-    "fomc": 120,
-    "interest rate": 100,
-    "rate cut": 110,
-    "rate hike": 110,
-    "hawkish": 100,
-    "dovish": 100,
+    "interest rate": 110,
+    "interest rates": 110,
+    "rate cut": 120,
+    "rate hike": 120,
+    "hawkish": 110,
+    "dovish": 110,
 
     # US DATA
-    "nfp": 130,
-    "nonfarm payroll": 130,
+    "nfp": 140,
+    "nonfarm payroll": 140,
     "jobs report": 120,
     "employment": 80,
-    "unemployment": 90,
-    "cpi": 120,
-    "inflation": 100,
-    "pce": 120,
+    "unemployment": 100,
+    "jobless claims": 100,
+    "cpi": 130,
+    "inflation": 110,
+    "pce": 130,
     "ppi": 100,
     "retail sales": 80,
-    "gdp": 70,
+    "gdp": 80,
 
     # USD
-    "us dollar": 90,
+    "us dollar": 100,
     "dollar": 60,
     "usd": 60,
-    "dxy": 110,
+    "dxy": 120,
 
     # YIELD
-    "treasury yield": 110,
-    "treasury yields": 110,
-    "10-year yield": 120,
-    "10 year yield": 120,
+    "treasury yield": 120,
+    "treasury yields": 120,
+    "10-year yield": 130,
+    "10 year yield": 130,
     "bond yields": 100,
 
     # WTI / OIL
-    "wti": 130,
-    "west texas intermediate": 130,
-    "wti crude": 130,
-    "crude oil": 110,
-    "oil prices": 100,
+    "wti": 140,
+    "wti crude": 140,
+    "west texas intermediate": 140,
+    "crude oil": 120,
     "oil price": 100,
+    "oil prices": 100,
     "oil supply": 110,
-    "oil inventory": 110,
-    "oil inventories": 110,
-    "eia": 100,
-    "opec": 110,
-    "opec+": 120,
+    "oil inventory": 120,
+    "oil inventories": 120,
+    "eia": 110,
+    "opec": 120,
+    "opec+": 130,
 
     # GEOPOLITICAL
-    "iran": 110,
+    "iran": 120,
     "israel": 100,
-    "gaza": 90,
-    "ukraine": 80,
-    "russia": 70,
+    "gaza": 100,
+    "ukraine": 90,
+    "russia": 80,
     "war": 100,
-    "missile": 100,
-    "attack": 90,
-    "strike": 90,
-    "military": 80,
-    "ceasefire": 90,
-    "sanctions": 90,
-    "hormuz": 120,
-    "strait of hormuz": 130,
+    "missile": 110,
+    "attack": 100,
+    "strike": 100,
+    "military": 90,
+    "ceasefire": 100,
+    "sanctions": 100,
+    "peace talks": 80,
+    "geopolitical": 90,
+    "hormuz": 140,
+    "strait of hormuz": 150,
 
     # RISK
-    "safe haven": 100,
-    "risk off": 100,
-    "risk-off": 100,
-    "market turmoil": 90,
+    "safe haven": 110,
+    "risk off": 110,
+    "risk-off": 110,
+    "market turmoil": 100,
+    "market volatility": 80,
 }
 
 
 # ============================================================
-# EXCLUDE
+# FALSE POSITIVE FILTER
 # ============================================================
 
 EXCLUDE = [
@@ -119,6 +129,7 @@ EXCLUDE = [
     "movie",
     "film",
     "music",
+    "singer",
     "celebrity",
     "fashion",
     "handbag",
@@ -126,6 +137,7 @@ EXCLUDE = [
     "real estate",
     "housing",
     "wedding",
+    "tourism",
 ]
 
 
@@ -133,7 +145,7 @@ EXCLUDE = [
 # SCORE
 # ============================================================
 
-def score_article(title):
+def calculate_score(title):
 
     text = title.lower()
 
@@ -147,7 +159,7 @@ def score_article(title):
     for word in EXCLUDE:
 
         if word in text:
-            score -= 150
+            score -= 200
 
     return score
 
@@ -166,6 +178,7 @@ def get_category(title):
         "jobs report",
         "employment",
         "unemployment",
+        "jobless claims",
     ]):
         return "💼 Tenaga Kerja"
 
@@ -191,6 +204,7 @@ def get_category(title):
 
     if any(x in text for x in [
         "wti",
+        "wti crude",
         "west texas intermediate",
         "crude oil",
         "oil price",
@@ -217,6 +231,8 @@ def get_category(title):
         "military",
         "ceasefire",
         "sanctions",
+        "peace talks",
+        "geopolitical",
     ]):
         return "🌍 Geopolitik"
 
@@ -268,7 +284,7 @@ def get_impact(score):
 
 
 # ============================================================
-# GOLD ANALYSIS
+# GOLD
 # ============================================================
 
 def analyze_gold(title):
@@ -298,6 +314,7 @@ def analyze_gold(title):
         "gaza",
         "ukraine",
         "sanctions",
+        "hormuz",
     ]
 
     bearish = [
@@ -313,8 +330,15 @@ def analyze_gold(title):
         "rising yields",
     ]
 
-    bull = sum(x in text for x in bullish)
-    bear = sum(x in text for x in bearish)
+    bull = sum(
+        1 for x in bullish
+        if x in text
+    )
+
+    bear = sum(
+        1 for x in bearish
+        if x in text
+    )
 
     if bull > bear:
         return (
@@ -327,7 +351,7 @@ def analyze_gold(title):
         return (
             "🔴 Gold:\n"
             "Berpotensi bearish. Faktor berita "
-            "dapat memberi tekanan pada Gold."
+            "dapat menekan Gold."
         )
 
     return (
@@ -338,34 +362,48 @@ def analyze_gold(title):
 
 
 # ============================================================
-# USD ANALYSIS
+# USD
 # ============================================================
 
 def analyze_usd(title):
 
     text = title.lower()
 
-    if any(x in text for x in [
+    bearish = [
         "weak dollar",
         "dollar falls",
         "dollar declines",
         "rate cut",
         "dovish",
         "lower yields",
-    ]):
+    ]
+
+    bullish = [
+        "strong dollar",
+        "dollar rises",
+        "rate hike",
+        "hawkish",
+        "higher yields",
+    ]
+
+    bear = sum(
+        1 for x in bearish
+        if x in text
+    )
+
+    bull = sum(
+        1 for x in bullish
+        if x in text
+    )
+
+    if bear > bull:
         return (
             "🟢 USD:\n"
             "Berpotensi melemah. Kondisi ini "
             "dapat mendukung Gold."
         )
 
-    if any(x in text for x in [
-        "strong dollar",
-        "dollar rises",
-        "rate hike",
-        "hawkish",
-        "higher yields",
-    ]):
+    if bull > bear:
         return (
             "🔴 USD:\n"
             "Berpotensi menguat. Kondisi ini "
@@ -417,7 +455,7 @@ def analyze_yield(title):
 
 
 # ============================================================
-# OIL
+# OIL / WTI
 # ============================================================
 
 def analyze_oil(title):
@@ -451,8 +489,15 @@ def analyze_oil(title):
         "opec increase",
     ]
 
-    bull = sum(x in text for x in bullish)
-    bear = sum(x in text for x in bearish)
+    bull = sum(
+        1 for x in bullish
+        if x in text
+    )
+
+    bear = sum(
+        1 for x in bearish
+        if x in text
+    )
 
     if bull > bear:
         return (
@@ -476,7 +521,7 @@ def analyze_oil(title):
 
 
 # ============================================================
-# NORMALIZE TITLE
+# DUPLICATE NORMALIZATION
 # ============================================================
 
 def normalize_title(title):
@@ -489,7 +534,7 @@ def normalize_title(title):
 
 
 # ============================================================
-# FETCH RSS
+# FETCH ONE RSS
 # ============================================================
 
 async def fetch_feed(session, source, url):
@@ -498,7 +543,7 @@ async def fetch_feed(session, source, url):
 
         async with session.get(
             url,
-            timeout=15,
+            timeout=aiohttp.ClientTimeout(total=15),
             headers={
                 "User-Agent":
                 "XAUUSD-Assistant/1.0"
@@ -506,6 +551,9 @@ async def fetch_feed(session, source, url):
         ) as response:
 
             if response.status != 200:
+                print(
+                    f"{source} RSS HTTP {response.status}"
+                )
                 return []
 
             content = await response.text()
@@ -516,12 +564,14 @@ async def fetch_feed(session, source, url):
 
             for entry in feed.entries:
 
-                title = (
-                    entry.get("title")
-                    or ""
-                ).strip()
+                title = html.unescape(
+                    (
+                        entry.get("title")
+                        or ""
+                    ).strip()
+                )
 
-                link = (
+                url = (
                     entry.get("link")
                     or ""
                 ).strip()
@@ -532,17 +582,17 @@ async def fetch_feed(session, source, url):
                     or ""
                 )
 
-                if not title or not link:
+                if not title or not url:
                     continue
 
-                score = score_article(title)
+                score = calculate_score(title)
 
                 if score < 70:
                     continue
 
                 results.append({
                     "title": title,
-                    "url": link,
+                    "url": url,
                     "source": source,
                     "published": published,
                     "score": score,
@@ -550,7 +600,11 @@ async def fetch_feed(session, source, url):
 
             return results
 
-    except Exception:
+    except Exception as e:
+
+        print(
+            f"{source} RSS ERROR: {e}"
+        )
 
         return []
 
@@ -575,21 +629,19 @@ async def get_news():
 
         for source, feeds in RSS_FEEDS.items():
 
-            for url in feeds:
+            for feed_url in feeds:
 
                 tasks.append(
                     fetch_feed(
                         session,
                         source,
-                        url
+                        feed_url,
                     )
                 )
 
-        results = await __import__(
-            "asyncio"
-        ).gather(
+        results = await asyncio.gather(
             *tasks,
-            return_exceptions=True
+            return_exceptions=True,
         )
 
         for result in results:
@@ -598,7 +650,7 @@ async def get_news():
                 articles.extend(result)
 
     # ========================================================
-    # REMOVE DUPLICATES
+    # DEDUPLICATE
     # ========================================================
 
     unique = {}
@@ -633,7 +685,7 @@ async def get_news():
 
 
 # ============================================================
-# FORMAT
+# FORMAT BREAKING NEWS
 # ============================================================
 
 def format_breaking_news(article):
