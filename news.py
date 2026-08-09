@@ -231,6 +231,15 @@ CATEGORY_KEYWORDS = {
 # ============================================================
 
 PRESERVE_TERMS = [
+    "investingLive",
+"InvestingLive",
+"Punchbowl News",
+"New York Fed",
+"Fed Chair",
+"US President",
+"US Treasury",
+"Wall Street",
+    
     "Non-Farm Payrolls",
     "Non-Farm Payroll",
     "Nonfarm Payrolls",
