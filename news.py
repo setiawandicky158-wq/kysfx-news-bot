@@ -1,74 +1,61 @@
 import requests
-import feedparser
+from bs4 import BeautifulSoup
 
 
-URLS = [
-    "https://investinglive.com/rss/",
-    "https://investinglive.com/rss/news/",
-]
+URL = "https://investinglive.com/news/"
 
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0"
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/151.0.0.0 Safari/537.36"
+    ),
+    "Accept": (
+        "text/html,application/xhtml+xml,"
+        "application/xml;q=0.9,*/*;q=0.8"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
 }
 
 
-def test_feed(url):
+def get_page():
 
     print("=" * 60)
-    print(f"[TEST] {url}")
+    print("[TEST] InvestingLive News")
 
     try:
+
         response = requests.get(
-            url,
+            URL,
             headers=HEADERS,
-            timeout=20
+            timeout=30
         )
 
-        print(f"[HTTP] Status: {response.status_code}")
+        print(
+            f"[HTTP] Status: "
+            f"{response.status_code}"
+        )
+
         print(
             f"[HTTP] Content-Type: "
             f"{response.headers.get('content-type')}"
         )
+
         print(
             f"[HTTP] Size: "
             f"{len(response.content)} bytes"
         )
 
-        feed = feedparser.parse(
-            response.content
-        )
-
-        print(
-            f"[RSS] Entries: "
-            f"{len(feed.entries)}"
-        )
-
-        if feed.bozo:
-            print(
-                f"[RSS] Parse warning: "
-                f"{feed.bozo_exception}"
-            )
-
-        for entry in feed.entries[:5]:
+        if response.status_code != 200:
 
             print(
-                "[NEWS]",
-                entry.get(
-                    "title",
-                    "NO TITLE"
-                )
+                "[ERROR] Halaman tidak dapat diakses."
             )
 
-            print(
-                "[LINK]",
-                entry.get(
-                    "link",
-                    "NO LINK"
-                )
-            )
+            return None
 
-        return feed
+        return response.text
 
     except Exception as e:
 
@@ -82,66 +69,148 @@ def test_feed(url):
 
 def get_news(limit=20):
 
-    all_news = []
+    html = get_page()
 
-    for url in URLS:
+    if not html:
 
-        feed = test_feed(url)
+        return []
 
-        if not feed:
-            continue
-
-        for entry in feed.entries[:limit]:
-
-            title = entry.get(
-                "title",
-                ""
-            ).strip()
-
-            link = entry.get(
-                "link",
-                ""
-            ).strip()
-
-            if not title:
-                continue
-
-            all_news.append(
-                {
-                    "title": title,
-                    "summary": entry.get(
-                        "summary",
-                        ""
-                    ),
-                    "link": link,
-                    "category": "📰 Market",
-                    "impact": "Market Impact",
-                    "stars": "⭐⭐⭐",
-                    "gold": (
-                        "Potensi volatilitas tinggi. "
-                        "Tunggu reaksi harga."
-                    ),
-                    "usd": (
-                        "Perhatikan arah dolar "
-                        "setelah rilis data/kebijakan."
-                    ),
-                    "yield": (
-                        "Pantau pergerakan "
-                        "US Treasury Yield."
-                    ),
-                    "oil": (
-                        "Perubahan minyak dapat "
-                        "mempengaruhi ekspektasi inflasi."
-                    ),
-                }
-            )
-
-    print(
-        f"[RESULT] Total news: "
-        f"{len(all_news)}"
+    soup = BeautifulSoup(
+        html,
+        "html.parser"
     )
 
-    return all_news
+    results = []
+
+    # --------------------------------------------------------
+    # Cari semua link artikel
+    # --------------------------------------------------------
+
+    links = soup.find_all(
+        "a",
+        href=True
+    )
+
+    seen = set()
+
+    for link in links:
+
+        href = link.get(
+            "href",
+            ""
+        ).strip()
+
+        title = link.get_text(
+            " ",
+            strip=True
+        )
+
+        if not href or not title:
+            continue
+
+        # Hanya artikel InvestingLive
+        if "/news/" not in href:
+            continue
+
+        if not href.startswith("http"):
+
+            href = (
+                "https://investinglive.com"
+                + href
+            )
+
+        if href in seen:
+            continue
+
+        seen.add(href)
+
+        # ----------------------------------------------------
+        # Filter judul yang relevan
+        # ----------------------------------------------------
+
+        text = title.lower()
+
+        keywords = [
+            "gold",
+            "xau",
+            "dollar",
+            "usd",
+            "fed",
+            "fomc",
+            "powell",
+            "yield",
+            "treasury",
+            "nfp",
+            "nonfarm",
+            "payroll",
+            "cpi",
+            "inflation",
+            "ppi",
+            "oil",
+            "wti",
+            "crude",
+            "opec",
+            "eia",
+            "gdp",
+            "tariff",
+            "sanction",
+            "iran",
+            "russia",
+            "ukraine",
+        ]
+
+        if not any(
+            keyword in text
+            for keyword in keywords
+        ):
+            continue
+
+        print(
+            "[NEWS]",
+            title
+        )
+
+        print(
+            "[LINK]",
+            href
+        )
+
+        results.append(
+            {
+                "title": title,
+                "summary": "",
+                "link": href,
+                "category": "📰 Market",
+                "impact": "Market Impact",
+                "stars": "⭐⭐⭐",
+                "gold": (
+                    "Potensi volatilitas tinggi. "
+                    "Tunggu reaksi harga."
+                ),
+                "usd": (
+                    "Perhatikan arah dolar "
+                    "setelah rilis data/kebijakan."
+                ),
+                "yield": (
+                    "Pantau pergerakan "
+                    "US Treasury Yield."
+                ),
+                "oil": (
+                    "Perubahan minyak dapat "
+                    "mempengaruhi ekspektasi inflasi."
+                ),
+            }
+        )
+
+        if len(results) >= limit:
+            break
+
+    print(
+        f"[RESULT] "
+        f"Relevant articles: {len(results)}"
+    )
+
+    return results
 
 
 def format_news(news):
