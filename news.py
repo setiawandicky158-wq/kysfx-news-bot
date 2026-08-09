@@ -6,12 +6,9 @@ import re
 import time
 
 
-# ============================================================
-# CONFIG
-# ============================================================
-
 BASE_URL = "https://investinglive.com"
 NEWS_URL = "https://investinglive.com/news/"
+
 
 HEADERS = {
     "User-Agent": (
@@ -24,7 +21,7 @@ HEADERS = {
 
 
 # ============================================================
-# GOLD
+# KEYWORDS
 # ============================================================
 
 GOLD_KEYWORDS = [
@@ -36,10 +33,6 @@ GOLD_KEYWORDS = [
     "precious metals",
 ]
 
-
-# ============================================================
-# USD
-# ============================================================
 
 USD_KEYWORDS = [
     "usd",
@@ -58,10 +51,6 @@ USD_KEYWORDS = [
 ]
 
 
-# ============================================================
-# YIELD
-# ============================================================
-
 YIELD_KEYWORDS = [
     "yield",
     "yields",
@@ -71,11 +60,12 @@ YIELD_KEYWORDS = [
     "10y",
     "us10y",
     "bond yield",
+    "bond yields",
 ]
 
 
 # ============================================================
-# OIL + WTI = SATU
+# OIL / WTI = SATU
 # ============================================================
 
 OIL_KEYWORDS = [
@@ -84,20 +74,18 @@ OIL_KEYWORDS = [
     "crude",
     "crude oil",
     "west texas intermediate",
+    "brent",
     "opec",
     "opec+",
     "oil inventory",
     "oil inventories",
+    "crude inventories",
     "oil production",
     "oil supply",
     "oil demand",
     "eia",
 ]
 
-
-# ============================================================
-# HIGH IMPACT
-# ============================================================
 
 HIGH_IMPACT_KEYWORDS = [
     "nfp",
@@ -144,7 +132,7 @@ HIGH_IMPACT_KEYWORDS = [
 
 
 # ============================================================
-# BLOCKED NEWS
+# BLOCKED TITLES
 # ============================================================
 
 BLOCKED_TITLE_KEYWORDS = [
@@ -193,6 +181,7 @@ CATEGORY_KEYWORDS = {
         "central bank",
         "rba",
         "boj",
+        "bo j",
         "ecb",
         "boe",
     ],
@@ -211,6 +200,8 @@ CATEGORY_KEYWORDS = {
         "oil",
         "wti",
         "crude",
+        "crude oil",
+        "brent",
         "opec",
         "opec+",
         "eia",
@@ -240,69 +231,137 @@ CATEGORY_KEYWORDS = {
         "ism",
         "pmi",
         "consumer confidence",
+        "consumer sentiment",
         "economic growth",
     ],
 }
 
 
 # ============================================================
-# ISTILAH YANG TIDAK BOLEH DITERJEMAHKAN
+# PROTECTED TERMS
+# ISTILAH INI TIDAK DITERJEMAHKAN
 # ============================================================
 
-PRESERVE_TERMS = [
-    "Non-Farm Payrolls",
-    "Non-Farm Payroll",
-    "nonfarm payrolls",
-    "nonfarm payroll",
-    "NFP",
+PROTECTED_TERMS = [
 
+    # GOLD / OIL / MARKET
     "Gold",
+    "Oil",
+    "Oil/WTI",
+    "WTI",
+    "Brent",
+    "Crude Oil",
+    "Crude",
     "XAUUSD",
     "XAU",
 
+    # USD / FX
     "USD",
     "DXY",
+    "USD/JPY",
+    "EUR/USD",
+    "GBP/USD",
+    "FX",
+    "Forex",
 
-    "Oil",
-    "WTI",
-    "Crude Oil",
-    "West Texas Intermediate",
+    # EMPLOYMENT
+    "Non-farm payrolls",
+    "Non-farm payroll",
+    "non-farm payrolls",
+    "non-farm payroll",
+    "Nonfarm payrolls",
+    "Nonfarm payroll",
+    "NFP",
+    "JOLTS",
+    "Jobless Claims",
+    "Initial Jobless Claims",
+    "Continuing Jobless Claims",
 
-    "Yield",
-    "Yields",
-    "Treasury Yield",
-    "US Treasury",
-
-    "Fed",
-    "Federal Reserve",
-    "FOMC",
-    "Powell",
-
+    # INFLATION
     "CPI",
     "Core CPI",
     "PPI",
-    "GDP",
+    "Core PPI",
     "PCE",
-    "JOLTS",
-    "ISM",
-    "PMI",
+    "Core PCE",
+    "Inflation",
 
+    # FED / CENTRAL BANK
+    "Fed",
+    "FED",
+    "Federal Reserve",
+    "FOMC",
+    "Fed Chair",
+    "Fed funds",
+    "Fed funds futures",
+    "rate hike",
+    "rate hikes",
+    "rate cut",
+    "rate cuts",
+    "interest rate",
+    "interest rates",
+    "rate decision",
+    "rate decisions",
+
+    # YIELD / BONDS
+    "Treasury Yield",
+    "Treasury Yields",
+    "US Treasury Yield",
+    "US Treasury Yields",
+    "10-year Treasury",
+    "10-year yield",
+    "10Y yield",
+    "10-year yields",
+    "bond yield",
+    "bond yields",
+    "Treasury",
+    "Treasury yields",
+
+    # ECONOMIC DATA
+    "GDP",
+    "PMI",
+    "ISM",
+    "Retail Sales",
+    "Consumer Confidence",
+    "Consumer Sentiment",
+
+    # CENTRAL BANKS
+    "RBA",
+    "BOJ",
+    "BoJ",
+    "ECB",
+    "BOE",
+    "Norges Bank",
+
+    # ENERGY
     "OPEC",
     "OPEC+",
     "EIA",
 
-    "RBA",
-    "BoJ",
-    "ECB",
-    "BOE",
+    # GEOPOLITICAL
+    "Iran",
+    "Israel",
+    "Russia",
+    "Ukraine",
+    "Middle East",
+    "Hormuz",
 
-    "Interest Rate",
-    "Rate Hike",
-    "Rate Cut",
+    # TRADING TERMS
+    "bullish",
+    "bearish",
+    "price action",
+    "liquidity",
+    "spread",
+    "futures",
+    "odds",
 
-    "Retail Sales",
-    "Jobless Claims",
-    "Unemployment Rate",
+    # ORGANIZATIONS / NAMES
+    "InvestingLive",
+    "investingLive",
+    "Punchbowl News",
+    "New York Fed",
+    "US Treasury",
+    "Wall Street",
 ]
 
 
@@ -316,7 +375,7 @@ def clean_text(text):
         return ""
 
     soup = BeautifulSoup(
-        str(text),
+        text,
         "html.parser"
     )
 
@@ -353,7 +412,7 @@ def clean_text(text):
 
                 changed = True
 
-    return text.strip()
+    return text
 
 
 # ============================================================
@@ -380,10 +439,7 @@ def normalize_url(url):
 # KEYWORD CHECK
 # ============================================================
 
-def contains_keyword(
-    text,
-    keywords
-):
+def contains_keyword(text, keywords):
 
     if not text:
         return False
@@ -412,165 +468,102 @@ def is_blocked_title(title):
 
 
 # ============================================================
-# CHECK URL
+# REAL ARTICLE TITLE
 # ============================================================
 
-def looks_like_url(text):
+def get_real_article_title(
+    url,
+    fallback_title=""
+):
 
-    if not text:
-        return True
+    try:
 
-    text = text.strip().lower()
-
-    if text.startswith("/news/"):
-        return True
-
-    if text.startswith("http://"):
-        return True
-
-    if text.startswith("https://"):
-        return True
-
-    if "investinglive.com/news/" in text:
-        return True
-
-    return False
-
-
-# ============================================================
-# EXTRACT TITLE
-# ============================================================
-
-def extract_title(link):
-
-    candidates = []
-
-    # --------------------------------------------------------
-    # 1. Text anchor
-    # --------------------------------------------------------
-
-    direct = clean_text(
-        link.get_text(
-            " ",
-            strip=True
-        )
-    )
-
-    if direct:
-        candidates.append(
-            direct
+        response = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=25
         )
 
-    # --------------------------------------------------------
-    # 2. Attributes
-    # --------------------------------------------------------
+        if response.status_code != 200:
 
-    for attr in [
-        "title",
-        "aria-label",
-        "data-title",
-        "data-headline",
-        "data-original-title",
-    ]:
-
-        value = clean_text(
-            link.get(
-                attr,
-                ""
-            )
-        )
-
-        if value:
-            candidates.append(
-                value
+            return clean_text(
+                fallback_title
             )
 
-    # --------------------------------------------------------
-    # 3. Parent elements
-    # --------------------------------------------------------
+        soup = BeautifulSoup(
+            response.text,
+            "html.parser"
+        )
 
-    parent = link.parent
+        og_title = soup.find(
+            "meta",
+            property="og:title"
+        )
 
-    for _ in range(5):
-
-        if not parent:
-            break
-
-        for heading in parent.find_all(
-            [
-                "h1",
-                "h2",
-                "h3",
-                "h4",
-                "h5",
-                "h6",
-            ]
-        ):
+        if og_title:
 
             value = clean_text(
-                heading.get_text(
+                og_title.get(
+                    "content",
+                    ""
+                )
+            )
+
+            if value:
+                return value
+
+        h1 = soup.find("h1")
+
+        if h1:
+
+            value = clean_text(
+                h1.get_text(
                     " ",
                     strip=True
                 )
             )
 
             if value:
-                candidates.append(
-                    value
-                )
+                return value
 
-        for attr in [
-            "title",
-            "aria-label",
-            "data-title",
-            "data-headline",
-        ]:
+        title_tag = soup.find("title")
+
+        if title_tag:
 
             value = clean_text(
-                parent.get(
-                    attr,
-                    ""
+                title_tag.get_text(
+                    " ",
+                    strip=True
                 )
             )
 
             if value:
-                candidates.append(
-                    value
+
+                value = re.sub(
+                    r"\s*\|\s*investingLive.*$",
+                    "",
+                    value,
+                    flags=re.IGNORECASE
                 )
 
-        parent = parent.parent
+                return value.strip()
 
-    # --------------------------------------------------------
-    # Pilih title valid
-    # --------------------------------------------------------
+    except Exception as e:
 
-    for candidate in candidates:
-
-        candidate = clean_text(
-            candidate
+        print(
+            "[TITLE ERROR]",
+            type(e).__name__,
+            str(e)
         )
 
-        if not candidate:
-            continue
-
-        if looks_like_url(
-            candidate
-        ):
-            continue
-
-        if len(candidate) < 15:
-            continue
-
-        if len(candidate) > 500:
-            continue
-
-        return candidate
-
-    return ""
+    return clean_text(
+        fallback_title
+    )
 
 
 # ============================================================
-# TRANSLATION
+# TRANSLATE KE INDONESIA
+# ISTILAH TRADING DILINDUNGI
 # ============================================================
 
 def translate_to_indonesian(text):
@@ -583,55 +576,46 @@ def translate_to_indonesian(text):
     if not text:
         return ""
 
-    placeholders = {}
-
+    protected = {}
     protected_text = text
 
-    # --------------------------------------------------------
-    # Sort dari istilah terpanjang
-    # --------------------------------------------------------
-
-    sorted_terms = sorted(
-        PRESERVE_TERMS,
+    terms = sorted(
+        set(PROTECTED_TERMS),
         key=len,
         reverse=True
     )
 
     # --------------------------------------------------------
-    # LOCK TERMS
+    # PROTECT TERMS
     # --------------------------------------------------------
 
-    counter = 0
+    for index, term in enumerate(terms):
 
-    for term in sorted_terms:
+        placeholder = f"ZXTERM{index}ZX"
 
         pattern = re.compile(
             re.escape(term),
             re.IGNORECASE
         )
 
-        def replace_term(
-            match
+        if pattern.search(
+            protected_text
         ):
 
-            nonlocal counter
-
-            key = (
-                f"ZZTERM{counter}ZZ"
+            match = pattern.search(
+                protected_text
             )
 
-            placeholders[key] = (
-                match.group(0)
+            original = match.group(0)
+
+            protected[
+                placeholder
+            ] = original
+
+            protected_text = pattern.sub(
+                placeholder,
+                protected_text
             )
-
-            counter += 1
-
-            return key
-
-        protected_text = pattern.sub(
-            replace_term,
-            protected_text
-        )
 
     # --------------------------------------------------------
     # TRANSLATE
@@ -642,7 +626,6 @@ def translate_to_indonesian(text):
         response = requests.get(
             "https://translate.googleapis.com/"
             "translate_a/single",
-
             params={
                 "client": "gtx",
                 "sl": "en",
@@ -650,9 +633,7 @@ def translate_to_indonesian(text):
                 "dt": "t",
                 "q": protected_text,
             },
-
             headers=HEADERS,
-
             timeout=20,
         )
 
@@ -683,26 +664,6 @@ def translate_to_indonesian(text):
 
             return text
 
-        # ----------------------------------------------------
-        # RESTORE TERMS
-        # ----------------------------------------------------
-
-        for key, original in (
-            placeholders.items()
-        ):
-
-            translated = translated.replace(
-                key,
-                original
-            )
-
-            translated = translated.replace(
-                key.lower(),
-                original
-            )
-
-        return translated
-
     except Exception as e:
 
         print(
@@ -712,6 +673,29 @@ def translate_to_indonesian(text):
         )
 
         return text
+
+    # --------------------------------------------------------
+    # RESTORE TERMS
+    # --------------------------------------------------------
+
+    for placeholder, original in protected.items():
+
+        translated = translated.replace(
+            placeholder,
+            original
+        )
+
+    # --------------------------------------------------------
+    # CLEANUP
+    # --------------------------------------------------------
+
+    translated = re.sub(
+        r"\s+",
+        " ",
+        translated
+    ).strip()
+
+    return translated
 
 
 # ============================================================
@@ -750,13 +734,11 @@ def detect_category(text):
 
 def calculate_impact(text):
 
-    lower = text.lower()
-
     score = 0
 
     for keyword in HIGH_IMPACT_KEYWORDS:
 
-        if keyword.lower() in lower:
+        if keyword.lower() in text.lower():
 
             score += 2
 
@@ -813,6 +795,110 @@ def calculate_impact(text):
         "Low Impact",
         "⭐⭐"
     )
+
+
+# ============================================================
+# ARTICLE BODY
+# ============================================================
+
+def get_article(url):
+
+    try:
+
+        response = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=30
+        )
+
+        if response.status_code != 200:
+
+            return ""
+
+        soup = BeautifulSoup(
+            response.text,
+            "html.parser"
+        )
+
+        for element in soup(
+            [
+                "script",
+                "style",
+                "noscript",
+                "svg",
+                "nav",
+                "footer",
+                "header",
+            ]
+        ):
+
+            element.decompose()
+
+        selectors = [
+            "article",
+            "[class*='article-body']",
+            "[class*='article-content']",
+            "[class*='post-content']",
+            "[class*='entry-content']",
+            "main",
+        ]
+
+        article_text = ""
+
+        for selector in selectors:
+
+            element = soup.select_one(
+                selector
+            )
+
+            if element:
+
+                text = clean_text(
+                    element.get_text(
+                        " ",
+                        strip=True
+                    )
+                )
+
+                if len(text) > len(
+                    article_text
+                ):
+
+                    article_text = text
+
+        if len(article_text) < 200:
+
+            paragraphs = soup.find_all(
+                "p"
+            )
+
+            article_text = " ".join(
+                clean_text(
+                    p.get_text(
+                        " ",
+                        strip=True
+                    )
+                )
+                for p in paragraphs
+            )
+
+        if len(article_text) < 200:
+
+            print(
+                "[ARTICLE] Content too short"
+            )
+
+        return article_text
+
+    except Exception as e:
+
+        print(
+            "[ARTICLE ERROR]",
+            type(e).__name__,
+            str(e)
+        )
+
+        return ""
 
 
 # ============================================================
@@ -963,7 +1049,8 @@ def analyze_yield(text):
     ):
 
         return (
-            "Kenaikan Yield dapat menekan Gold."
+            "Kenaikan Treasury Yield "
+            "dapat menekan Gold."
         )
 
     if any(
@@ -972,11 +1059,12 @@ def analyze_yield(text):
     ):
 
         return (
-            "Penurunan Yield dapat mendukung Gold."
+            "Penurunan Treasury Yield "
+            "dapat mendukung Gold."
         )
 
     return (
-        "Pantau pergerakan US Treasury Yield."
+        "Pantau pergerakan Treasury Yield."
     )
 
 
@@ -1000,6 +1088,7 @@ def analyze_oil(text):
         "crude rises",
         "crude higher",
         "oil rally",
+        "crude rally",
     ]
 
     bearish = [
@@ -1051,40 +1140,6 @@ def analyze_oil(text):
 
 
 # ============================================================
-# RELEVANCE
-# ============================================================
-
-def is_relevant(text):
-
-    return (
-        contains_keyword(
-            text,
-            GOLD_KEYWORDS
-        )
-        or
-        contains_keyword(
-            text,
-            USD_KEYWORDS
-        )
-        or
-        contains_keyword(
-            text,
-            YIELD_KEYWORDS
-        )
-        or
-        contains_keyword(
-            text,
-            OIL_KEYWORDS
-        )
-        or
-        contains_keyword(
-            text,
-            HIGH_IMPACT_KEYWORDS
-        )
-    )
-
-
-# ============================================================
 # GET NEWS
 # ============================================================
 
@@ -1127,16 +1182,18 @@ def get_news(limit=10):
         return []
 
     candidates = []
-    seen_urls = set()
+    seen = set()
 
-    # ========================================================
-    # FIND ARTICLE LINKS
-    # ========================================================
-
-    for link in soup.find_all(
+    links = soup.find_all(
         "a",
         href=True
-    ):
+    )
+
+    # ========================================================
+    # AMBIL LINK
+    # ========================================================
+
+    for link in links:
 
         href = normalize_url(
             link.get(
@@ -1145,85 +1202,40 @@ def get_news(limit=10):
             )
         )
 
-        if not href:
-            continue
+        raw_title = clean_text(
+            link.get_text(
+                " ",
+                strip=True
+            )
+        )
 
-        if not href.startswith(
-            BASE_URL
-        ):
+        if not href:
             continue
 
         if "/news/" not in href:
             continue
 
-        if href.rstrip(
-            "/"
-        ) == NEWS_URL.rstrip(
-            "/"
-        ):
+        if href in seen:
             continue
 
-        if href in seen_urls:
-            continue
-
-        title = extract_title(
-            link
-        )
-
-        # ----------------------------------------------------
-        # Fallback: buat title dari URL slug
-        # ----------------------------------------------------
-
-        if not title:
-
-            slug = href.rstrip(
-                "/"
-            ).split(
-                "/"
-            )[-1]
-
-            if slug:
-
-                title = slug.replace(
-                    "-",
-                    " "
-                )
-
-        title = clean_text(
-            title
-        )
-
-        if not title:
-            continue
-
-        if looks_like_url(
-            title
-        ):
-            continue
-
-        if len(title) < 15:
-            continue
+        seen.add(href)
 
         if is_blocked_title(
-            title
+            raw_title
         ):
 
             print(
                 "[FILTER] Blocked:",
-                title
+                raw_title
             )
 
             continue
 
-        seen_urls.add(
-            href
-        )
-
         candidates.append(
-            {
-                "title": title,
-                "link": href,
-            }
+            (
+                raw_title,
+                href
+            )
         )
 
     print(
@@ -1234,84 +1246,170 @@ def get_news(limit=10):
     results = []
 
     # ========================================================
-    # PROCESS ARTICLES
+    # PROSES ARTIKEL
     # ========================================================
 
-    for item in candidates:
-
-        title = item["title"]
-        link = item["link"]
+    for raw_title, href in candidates:
 
         print(
             "[NEWS] Checking:",
-            title
+            raw_title
         )
 
-        if not is_relevant(
-            title
+        real_title = get_real_article_title(
+            href,
+            raw_title
+        )
+
+        real_title = clean_text(
+            real_title
+        )
+
+        if not real_title:
+            continue
+
+        if is_blocked_title(
+            real_title
         ):
 
             print(
+                "[FILTER] Blocked:",
+                real_title
+            )
+
+            continue
+
+        article = get_article(
+            href
+        )
+
+        full_text = (
+            real_title
+            + " "
+            + article
+        )
+
+        relevant = (
+            contains_keyword(
+                full_text,
+                GOLD_KEYWORDS
+            )
+            or contains_keyword(
+                full_text,
+                USD_KEYWORDS
+            )
+            or contains_keyword(
+                full_text,
+                YIELD_KEYWORDS
+            )
+            or contains_keyword(
+                full_text,
+                OIL_KEYWORDS
+            )
+            or contains_keyword(
+                full_text,
+                HIGH_IMPACT_KEYWORDS
+            )
+        )
+
+        if not relevant:
+
+            print(
                 "[FILTER] Not relevant:",
-                title
+                real_title
             )
 
             continue
 
         print(
             "[NEWS] Relevant:",
-            title
+            real_title
         )
-
-        # ----------------------------------------------------
-        # TRANSLATE ONLY TITLE
-        # ----------------------------------------------------
-
-        print(
-            "[TRANSLATE] English:",
-            title
-        )
-
-        translated_title = (
-            translate_to_indonesian(
-                title
-            )
-        )
-
-        print(
-            "[TRANSLATE] Indonesian:",
-            translated_title
-        )
-
-        # ----------------------------------------------------
-        # IMPACT
-        # ----------------------------------------------------
 
         impact, stars = calculate_impact(
-            title
+            full_text
         )
-
-        # ----------------------------------------------------
-        # CATEGORY
-        # ----------------------------------------------------
 
         category = detect_category(
-            title
+            full_text
         )
 
-        # ----------------------------------------------------
-        # UNIQUE ID
-        # ----------------------------------------------------
-
         news_id = hashlib.sha256(
-            link.encode(
+            href.encode(
                 "utf-8"
             )
         ).hexdigest()
 
-        # ----------------------------------------------------
+        # ====================================================
+        # TRANSLATE TITLE
+        # ====================================================
+
+        print(
+            "[TRANSLATE] English Title:",
+            real_title
+        )
+
+        translated_title = (
+            translate_to_indonesian(
+                real_title
+            )
+        )
+
+        print(
+            "[TRANSLATE] Indonesian Title:",
+            translated_title
+        )
+
+        # ====================================================
+        # SUMMARY
+        # ====================================================
+
+        summary = ""
+
+        if article:
+
+            summary = article
+
+            # Hindari summary terlalu panjang
+            if len(summary) > 1200:
+
+                summary = summary[:1200]
+
+                last_space = summary.rfind(" ")
+
+                if last_space > 500:
+
+                    summary = summary[
+                        :last_space
+                    ]
+
+            print(
+                "[TRANSLATE] English Summary:",
+                summary
+            )
+
+            translated_summary = (
+                translate_to_indonesian(
+                    summary
+                )
+            )
+
+            print(
+                "[TRANSLATE] Indonesian Summary:",
+                translated_summary
+            )
+
+        else:
+
+            translated_summary = ""
+
+            print(
+                "[SUMMARY] No valid article summary"
+            )
+
+        # ====================================================
         # RESULT
-        # ----------------------------------------------------
+        # ====================================================
 
         result = {
 
@@ -1319,9 +1417,9 @@ def get_news(limit=10):
 
             "title": translated_title,
 
-            "summary": "",
+            "summary": translated_summary,
 
-            "link": link,
+            "link": href,
 
             "category": category,
 
@@ -1330,19 +1428,19 @@ def get_news(limit=10):
             "stars": stars,
 
             "gold": analyze_gold(
-                title
+                full_text
             ),
 
             "usd": analyze_usd(
-                title
+                full_text
             ),
 
             "yield": analyze_yield(
-                title
+                full_text
             ),
 
             "oil": analyze_oil(
-                title
+                full_text
             ),
         }
 
@@ -1351,10 +1449,11 @@ def get_news(limit=10):
         )
 
         if len(results) >= limit:
+
             break
 
         time.sleep(
-            0.4
+            0.5
         )
 
     print(
@@ -1371,28 +1470,78 @@ def get_news(limit=10):
 
 def format_news(news):
 
-    return (
+    message = (
         "🚨 <b>BREAKING NEWS</b>\n"
         f"📂 {news['category']}\n\n"
+        f"📰 <b>{news['title']}</b>\n"
+    )
 
-        f"📰 <b>{news['title']}</b>\n\n"
+    # ========================================================
+    # SUMMARY
+    # ========================================================
 
+    if news.get("summary"):
+
+        message += (
+            "\n"
+            f"📝 <b>Ringkasan:</b>\n"
+            f"{news['summary']}\n"
+        )
+
+    # ========================================================
+    # IMPACT
+    # ========================================================
+
+    message += (
+        "\n"
         f"⚠️ <b>{news['impact']}</b> "
         f"{news['stars']}\n\n"
+    )
 
-        f"🟡 <b>Gold:</b>\n"
+    # ========================================================
+    # GOLD
+    # ========================================================
+
+    message += (
+        "🟡 <b>Gold:</b>\n"
         f"{news['gold']}\n\n"
+    )
 
-        f"💵 <b>USD:</b>\n"
+    # ========================================================
+    # USD
+    # ========================================================
+
+    message += (
+        "💵 <b>USD:</b>\n"
         f"{news['usd']}\n\n"
+    )
 
-        f"📈 <b>Yield:</b>\n"
+    # ========================================================
+    # YIELD
+    # ========================================================
+
+    message += (
+        "📈 <b>Yield:</b>\n"
         f"{news['yield']}\n\n"
+    )
 
-        f"🛢️ <b>Oil:</b>\n"
+    # ========================================================
+    # OIL / WTI
+    # ========================================================
+
+    message += (
+        "🛢️ <b>Oil:</b>\n"
         f"{news['oil']}\n\n"
+    )
 
-        f"🔗 <a href=\"{news['link']}\">"
+    # ========================================================
+    # SOURCE
+    # ========================================================
+
+    message += (
+        f'🔗 <a href="{news["link"]}">'
         "Sumber berita"
         "</a>"
     )
+
+    return message
