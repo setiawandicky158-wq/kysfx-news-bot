@@ -16,6 +16,10 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/151.0.0.0 Safari/537.36"
     ),
+    "Accept": (
+        "text/html,application/xhtml+xml,"
+        "application/xml;q=0.9,*/*;q=0.8"
+    ),
     "Accept-Language": "en-US,en;q=0.9",
 }
 
@@ -51,6 +55,7 @@ USD_KEYWORDS = [
     "interest rate",
     "rate cut",
     "rate hike",
+    "rate decision",
 ]
 
 
@@ -71,7 +76,7 @@ YIELD_KEYWORDS = [
 
 
 # ============================================================
-# OIL + WTI = SATU
+# OIL / WTI
 # ============================================================
 
 OIL_KEYWORDS = [
@@ -102,6 +107,7 @@ HIGH_IMPACT_KEYWORDS = [
     "payroll",
     "employment report",
     "unemployment rate",
+    "unemployment",
     "cpi",
     "core cpi",
     "inflation",
@@ -139,15 +145,19 @@ HIGH_IMPACT_KEYWORDS = [
 
 
 # ============================================================
-# BERITA YANG TIDAK DIKIRIM
+# BLOCKED
+#
+# HANYA UNTUK JUDUL / HEADLINE
+# JANGAN DIGUNAKAN UNTUK ISI ARTIKEL
 # ============================================================
 
-BLOCKED_KEYWORDS = [
+BLOCKED_TITLE_KEYWORDS = [
     "newsquawk week ahead",
+    "newsquawk weekly preview",
+    "newsquawk weekly outlook",
     "week ahead",
     "weekly preview",
     "weekly outlook",
-    "week ahead preview",
     "events next week",
     "calendar next week",
     "coming week",
@@ -261,18 +271,15 @@ def clean_text(text):
     )
 
 
-def contains_keyword(
-    text,
-    keywords
-):
+def contains_keyword(text, keywords):
 
     if not text:
         return False
 
-    text_lower = text.lower()
+    lower = text.lower()
 
     return any(
-        keyword.lower() in text_lower
+        keyword.lower() in lower
         for keyword in keywords
     )
 
@@ -293,14 +300,18 @@ def normalize_url(url):
     return url
 
 
-def is_blocked_news(text):
+# ============================================================
+# BLOCK ONLY HEADLINE
+# ============================================================
 
-    if not text:
+def is_blocked_title(title):
+
+    if not title:
         return True
 
     return contains_keyword(
-        text,
-        BLOCKED_KEYWORDS
+        title,
+        BLOCKED_TITLE_KEYWORDS
     )
 
 
@@ -356,7 +367,10 @@ def translate_to_indonesian(text):
 
         translated = translated.strip()
 
-        return translated or text
+        if translated:
+            return translated
+
+        return text
 
     except Exception as e:
 
@@ -375,7 +389,7 @@ def translate_to_indonesian(text):
 
 def detect_category(text):
 
-    text_lower = text.lower()
+    lower = text.lower()
 
     order = [
         "💼 Tenaga Kerja",
@@ -392,8 +406,7 @@ def detect_category(text):
             category
         ]:
 
-            if keyword.lower() in text_lower:
-
+            if keyword.lower() in lower:
                 return category
 
     return "📰 Market"
@@ -407,9 +420,11 @@ def calculate_impact(text):
 
     score = 0
 
+    lower = text.lower()
+
     for keyword in HIGH_IMPACT_KEYWORDS:
 
-        if keyword.lower() in text.lower():
+        if keyword.lower() in lower:
             score += 2
 
     if contains_keyword(
@@ -561,7 +576,7 @@ def get_article(url):
 
 
 # ============================================================
-# GOLD ANALYSIS
+# GOLD
 # ============================================================
 
 def analyze_gold(text):
@@ -620,7 +635,7 @@ def analyze_gold(text):
 
 
 # ============================================================
-# USD ANALYSIS
+# USD
 # ============================================================
 
 def analyze_usd(text):
@@ -677,7 +692,7 @@ def analyze_usd(text):
 
 
 # ============================================================
-# YIELD ANALYSIS
+# YIELD
 # ============================================================
 
 def analyze_yield(text):
@@ -726,7 +741,7 @@ def analyze_yield(text):
 
 
 # ============================================================
-# OIL / WTI ANALYSIS
+# OIL / WTI
 # ============================================================
 
 def analyze_oil(text):
@@ -819,7 +834,6 @@ def get_news(limit=10):
         )
 
         if response.status_code != 200:
-
             return []
 
         soup = BeautifulSoup(
@@ -837,19 +851,13 @@ def get_news(limit=10):
 
         return []
 
-    results = []
+    candidates = []
     seen = set()
 
     links = soup.find_all(
         "a",
         href=True
     )
-
-    # ========================================================
-    # PERTAMA: AMBIL SEMUA LINK BERITA
-    # ========================================================
-
-    candidates = []
 
     for link in links:
 
@@ -878,9 +886,19 @@ def get_news(limit=10):
 
         seen.add(href)
 
-        if is_blocked_news(
+        # ====================================================
+        # BLOKIR HANYA BERDASARKAN JUDUL
+        # ====================================================
+
+        if is_blocked_title(
             title
         ):
+
+            print(
+                "[FILTER] Blocked title:",
+                title
+            )
+
             continue
 
         candidates.append(
@@ -895,84 +913,22 @@ def get_news(limit=10):
         len(candidates)
     )
 
-    # ========================================================
-    # PROSES CANDIDATES
-    # ========================================================
+    results = []
 
     for title, href in candidates:
 
-        # ----------------------------------------------------
-        # HEADLINE RELEVANCE
-        # ----------------------------------------------------
-
-        headline_relevant = (
-            contains_keyword(
-                title,
-                GOLD_KEYWORDS
-            )
-            or contains_keyword(
-                title,
-                USD_KEYWORDS
-            )
-            or contains_keyword(
-                title,
-                YIELD_KEYWORDS
-            )
-            or contains_keyword(
-                title,
-                OIL_KEYWORDS
-            )
-            or contains_keyword(
-                title,
-                HIGH_IMPACT_KEYWORDS
-            )
+        article = get_article(
+            href
         )
-
-        # ----------------------------------------------------
-        # Kalau headline belum jelas,
-        # baca artikelnya
-        # ----------------------------------------------------
-
-        article = ""
-
-        if headline_relevant:
-
-            article = get_article(
-                href
-            )
-
-        else:
-
-            # Tetap baca artikel karena
-            # headline InvestingLive terkadang
-            # tidak menyebut Gold/USD secara langsung.
-
-            article = get_article(
-                href
-            )
 
         full_text = (
             title + " " + article
         )
 
-        # ----------------------------------------------------
-        # FILTER AGENDA / WEEK AHEAD
-        # ----------------------------------------------------
-
-        if is_blocked_news(
-            full_text
-        ):
-
-            print(
-                "[FILTER] Blocked:",
-                title
-            )
-
-            continue
-
-        # ----------------------------------------------------
-        # RELEVANSI FINAL
-        # ----------------------------------------------------
+        # ====================================================
+        # JANGAN FILTER "WEEK AHEAD"
+        # DARI ISI ARTIKEL
+        # ====================================================
 
         relevant = (
             contains_keyword(
@@ -999,6 +955,11 @@ def get_news(limit=10):
 
         if not relevant:
 
+            print(
+                "[FILTER] Not relevant:",
+                title
+            )
+
             continue
 
         print(
@@ -1006,9 +967,9 @@ def get_news(limit=10):
             title
         )
 
-        # ----------------------------------------------------
+        # ====================================================
         # IMPACT
-        # ----------------------------------------------------
+        # ====================================================
 
         impact, stars = calculate_impact(
             full_text
@@ -1018,17 +979,19 @@ def get_news(limit=10):
             full_text
         )
 
-        # ----------------------------------------------------
+        # ====================================================
         # UNIQUE ID
-        # ----------------------------------------------------
+        # ====================================================
 
         news_id = hashlib.sha256(
-            href.encode("utf-8")
+            href.encode(
+                "utf-8"
+            )
         ).hexdigest()
 
-        # ----------------------------------------------------
-        # TRANSLATE
-        # ----------------------------------------------------
+        # ====================================================
+        # TRANSLATE HEADLINE
+        # ====================================================
 
         print(
             "[TRANSLATE] English:",
@@ -1046,9 +1009,9 @@ def get_news(limit=10):
             translated_title
         )
 
-        # ----------------------------------------------------
+        # ====================================================
         # RESULT
-        # ----------------------------------------------------
+        # ====================================================
 
         result = {
 
@@ -1090,8 +1053,6 @@ def get_news(limit=10):
         if len(results) >= limit:
             break
 
-        # Jangan terlalu cepat
-        # request ke server.
         time.sleep(0.2)
 
     print(
