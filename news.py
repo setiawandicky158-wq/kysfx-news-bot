@@ -63,7 +63,7 @@ YIELD_KEYWORDS = [
     "bond yield",
 ]
 
-# OIL DAN WTI SENGAJA SATU KATEGORI
+# OIL + WTI = SATU
 OIL_KEYWORDS = [
     "oil",
     "wti",
@@ -249,7 +249,6 @@ def clean_text(text):
         text.split()
     )
 
-    # Bersihkan prefix yang sering ikut
     prefixes = [
         "investingLive",
         "InvestingLive",
@@ -274,11 +273,11 @@ def clean_text(text):
 
                 changed = True
 
-    return text
+    return text.strip()
 
 
 # ============================================================
-# NORMALIZE URL
+# URL
 # ============================================================
 
 def normalize_url(url):
@@ -298,7 +297,7 @@ def normalize_url(url):
 
 
 # ============================================================
-# KEYWORD CHECK
+# KEYWORD
 # ============================================================
 
 def contains_keyword(
@@ -317,10 +316,6 @@ def contains_keyword(
     )
 
 
-# ============================================================
-# BLOCKED TITLE
-# ============================================================
-
 def is_blocked_title(title):
 
     if not title:
@@ -333,69 +328,181 @@ def is_blocked_title(title):
 
 
 # ============================================================
-# EXTRACT TITLE
+# CHECK WHETHER TEXT IS ACTUALLY A URL
 # ============================================================
 
-def extract_title(link):
+def looks_like_url(text):
 
-    # Ambil teks anchor
-    title = clean_text(
+    if not text:
+        return True
+
+    text = text.strip().lower()
+
+    if text.startswith(
+        "/news/"
+    ):
+
+        return True
+
+    if text.startswith(
+        "http://"
+    ):
+
+        return True
+
+    if text.startswith(
+        "https://"
+    ):
+
+        return True
+
+    if "investinglive.com/news/" in text:
+
+        return True
+
+    return False
+
+
+# ============================================================
+# EXTRACT ARTICLE TITLE
+# ============================================================
+
+def extract_title(
+    link
+):
+
+    candidates = []
+
+    # --------------------------------------------------------
+    # 1. Direct text
+    # --------------------------------------------------------
+
+    direct = clean_text(
         link.get_text(
             " ",
             strip=True
         )
     )
 
-    # --------------------------------------------------------
-    # Bersihkan prefix website
-    # --------------------------------------------------------
-
-    title = re.sub(
-        r"^(investinglive|investingLive|investment)\s*",
-        "",
-        title,
-        flags=re.IGNORECASE
-    )
+    if direct:
+        candidates.append(
+            direct
+        )
 
     # --------------------------------------------------------
-    # Bersihkan whitespace
+    # 2. Attributes
     # --------------------------------------------------------
 
-    title = " ".join(
-        title.split()
-    )
+    for attr in [
+        "title",
+        "aria-label",
+        "data-title",
+        "data-headline",
+        "data-original-title",
+    ]:
+
+        value = clean_text(
+            link.get(
+                attr,
+                ""
+            )
+        )
+
+        if value:
+            candidates.append(
+                value
+            )
 
     # --------------------------------------------------------
-    # Jika title kosong, coba atribut
+    # 3. Parent card
     # --------------------------------------------------------
 
-    if not title:
+    parent = link.parent
 
+    for _ in range(4):
+
+        if not parent:
+            break
+
+        # h1-h6
+        for heading in parent.find_all(
+            [
+                "h1",
+                "h2",
+                "h3",
+                "h4",
+                "h5",
+                "h6",
+            ]
+        ):
+
+            value = clean_text(
+                heading.get_text(
+                    " ",
+                    strip=True
+                )
+            )
+
+            if value:
+                candidates.append(
+                    value
+                )
+
+        # title attributes
         for attr in [
             "title",
             "aria-label",
             "data-title",
+            "data-headline",
         ]:
 
-            value = link.get(
-                attr,
-                ""
-            )
-
             value = clean_text(
-                value
+                parent.get(
+                    attr,
+                    ""
+                )
             )
 
             if value:
+                candidates.append(
+                    value
+                )
 
-                title = value
-                break
+        parent = parent.parent
 
-    return title.strip()
+    # --------------------------------------------------------
+    # Pilih kandidat pertama yang bukan URL
+    # --------------------------------------------------------
+
+    for candidate in candidates:
+
+        candidate = clean_text(
+            candidate
+        )
+
+        if not candidate:
+            continue
+
+        if looks_like_url(
+            candidate
+        ):
+            continue
+
+        if len(candidate) < 15:
+            continue
+
+        # Hindari teks terlalu panjang
+        # yang merupakan gabungan card
+        if len(candidate) > 500:
+            continue
+
+        return candidate
+
+    return ""
 
 
 # ============================================================
-# TRANSLATE
+# TRANSLATION
 # ============================================================
 
 def translate_to_indonesian(
@@ -406,9 +513,6 @@ def translate_to_indonesian(
         return ""
 
     text = text.strip()
-
-    if not text:
-        return ""
 
     try:
 
@@ -451,9 +555,7 @@ def translate_to_indonesian(
 
         translated = translated.strip()
 
-        if translated:
-
-            return translated
+        return translated or text
 
     except Exception as e:
 
@@ -463,7 +565,7 @@ def translate_to_indonesian(
             str(e)
         )
 
-    return text
+        return text
 
 
 # ============================================================
@@ -572,7 +674,7 @@ def calculate_impact(
 
 
 # ============================================================
-# GOLD ANALYSIS
+# GOLD
 # ============================================================
 
 def analyze_gold(
@@ -633,7 +735,7 @@ def analyze_gold(
 
 
 # ============================================================
-# USD ANALYSIS
+# USD
 # ============================================================
 
 def analyze_usd(
@@ -692,7 +794,7 @@ def analyze_usd(
 
 
 # ============================================================
-# YIELD ANALYSIS
+# YIELD
 # ============================================================
 
 def analyze_yield(
@@ -743,7 +845,7 @@ def analyze_yield(
 
 
 # ============================================================
-# OIL / WTI ANALYSIS
+# OIL / WTI
 # ============================================================
 
 def analyze_oil(
@@ -898,7 +1000,7 @@ def get_news(
     seen_urls = set()
 
     # ========================================================
-    # AMBIL SEMUA LINK BERITA DARI HALAMAN NEWS
+    # FIND ARTICLES
     # ========================================================
 
     for link in soup.find_all(
@@ -916,11 +1018,8 @@ def get_news(
         if not href:
             continue
 
-        # Hanya artikel InvestingLive
-        if (
-            not href.startswith(
-                BASE_URL
-            )
+        if not href.startswith(
+            BASE_URL
         ):
 
             continue
@@ -929,12 +1028,10 @@ def get_news(
 
             continue
 
-        # Hindari halaman umum
         if href.rstrip("/") == NEWS_URL.rstrip("/"):
 
             continue
 
-        # Hindari duplikat
         if href in seen_urls:
 
             continue
@@ -945,19 +1042,39 @@ def get_news(
 
         if not title:
 
-            continue
+            # Jika anchor tidak memiliki title,
+            # coba cari slug URL sebagai fallback
+            slug = href.rstrip(
+                "/"
+            ).split(
+                "/"
+            )[-1]
 
-        # Bersihkan title
+            if slug:
+
+                title = slug.replace(
+                    "-",
+                    " "
+                )
+
         title = clean_text(
             title
         )
 
-        # Jangan masukkan halaman yang bukan artikel
+        if not title:
+
+            continue
+
+        if looks_like_url(
+            title
+        ):
+
+            continue
+
         if len(title) < 15:
 
             continue
 
-        # Jangan kirim artikel mingguan
         if is_blocked_title(
             title
         ):
@@ -988,7 +1105,7 @@ def get_news(
     results = []
 
     # ========================================================
-    # PROSES BERITA
+    # PROCESS
     # ========================================================
 
     for item in candidates:
@@ -1001,16 +1118,12 @@ def get_news(
             title
         )
 
-        # ----------------------------------------------------
-        # Relevance berdasarkan HEADLINE
-        # ----------------------------------------------------
-
         if not is_relevant(
             title
         ):
 
             print(
-                "[FILTER] Blocked:",
+                "[FILTER] Not relevant:",
                 title
             )
 
@@ -1022,7 +1135,7 @@ def get_news(
         )
 
         # ----------------------------------------------------
-        # TRANSLATE HEADLINE
+        # TRANSLATE
         # ----------------------------------------------------
 
         print(
@@ -1042,20 +1155,15 @@ def get_news(
         )
 
         # ----------------------------------------------------
-        # FULL TEXT UNTUK ANALISIS
-        #
-        # Kita gunakan headline sebagai basis agar tidak
-        # request halaman artikel berkali-kali.
+        # ANALYSIS
         # ----------------------------------------------------
 
-        analysis_text = title
-
         impact, stars = calculate_impact(
-            analysis_text
+            title
         )
 
         category = detect_category(
-            analysis_text
+            title
         )
 
         news_id = hashlib.sha256(
@@ -1081,19 +1189,19 @@ def get_news(
             "stars": stars,
 
             "gold": analyze_gold(
-                analysis_text
+                title
             ),
 
             "usd": analyze_usd(
-                analysis_text
+                title
             ),
 
             "yield": analyze_yield(
-                analysis_text
+                title
             ),
 
             "oil": analyze_oil(
-                analysis_text
+                title
             ),
         }
 
