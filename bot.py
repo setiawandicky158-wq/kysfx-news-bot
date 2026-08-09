@@ -18,7 +18,6 @@ logging.basicConfig(
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 
 
 # ============================================================
