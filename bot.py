@@ -7,6 +7,10 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 
+# ============================================================
+# CONFIG
+# ============================================================
+
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s",
     level=logging.INFO,
@@ -24,15 +28,15 @@ GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 KEYWORDS = {
 
     # GOLD
-    "xauusd": 120,
-    "gold price": 100,
-    "gold prices": 100,
-    "gold rises": 90,
-    "gold falls": 90,
-    "gold futures": 90,
-    "bullion": 70,
+    "xauusd": 100,
+    "gold price": 90,
+    "gold prices": 90,
+    "gold rises": 80,
+    "gold falls": 80,
+    "gold futures": 80,
+    "bullion": 60,
 
-    # FED / USD
+    # FED
     "federal reserve": 100,
     "fomc": 100,
     "fed": 80,
@@ -40,19 +44,22 @@ KEYWORDS = {
     "interest rates": 80,
     "rate cut": 90,
     "rate hike": 90,
-    "monetary policy": 70,
+    "hawkish": 80,
+    "dovish": 80,
 
-    # US DATA
+    # ECONOMIC DATA
     "cpi": 90,
     "inflation": 80,
     "nonfarm payroll": 100,
     "nfp": 100,
     "jobs report": 90,
+    "unemployment": 80,
     "pce": 90,
     "ppi": 80,
-    "unemployment": 70,
+    "retail sales": 60,
+    "gdp": 60,
 
-    # USD / YIELDS
+    # USD / YIELD
     "us dollar": 70,
     "usd": 60,
     "dollar": 45,
@@ -63,10 +70,7 @@ KEYWORDS = {
     "10 year yield": 100,
     "bond yields": 70,
 
-    # ========================================================
-    # WTI / OIL
-    # ========================================================
-
+    # WTI
     "wti": 120,
     "west texas intermediate": 120,
     "wti crude": 120,
@@ -74,7 +78,7 @@ KEYWORDS = {
     "crude oil": 90,
     "oil price": 80,
     "oil prices": 80,
-    "oil supply": 100,
+    "oil supply": 90,
     "oil production": 70,
     "oil inventory": 100,
     "oil inventories": 100,
@@ -85,7 +89,7 @@ KEYWORDS = {
     "saudi arabia": 60,
     "strait of hormuz": 100,
 
-    # GEOPOLITICS
+    # GEOPOLITICAL
     "iran": 90,
     "israel": 70,
     "gaza": 60,
@@ -101,7 +105,7 @@ KEYWORDS = {
     "peace talks": 60,
     "geopolitical": 60,
 
-    # MARKET SENTIMENT
+    # RISK
     "safe haven": 90,
     "risk off": 80,
     "risk-off": 80,
@@ -144,7 +148,6 @@ NEGATIVE_WORDS = {
 def calculate_score(title):
 
     text = title.lower()
-
     score = 0
 
     for keyword, points in KEYWORDS.items():
@@ -160,15 +163,21 @@ def calculate_score(title):
     return score
 
 
-def classify(score):
+def get_stars(score):
 
-    if score >= 120:
-        return "🔴 HIGH"
+    if score >= 180:
+        return "⭐⭐⭐⭐⭐"
 
-    if score >= 70:
-        return "🟠 MEDIUM"
+    if score >= 130:
+        return "⭐⭐⭐⭐"
 
-    return "🟢 LOW"
+    if score >= 90:
+        return "⭐⭐⭐"
+
+    if score >= 60:
+        return "⭐⭐"
+
+    return "⭐"
 
 
 # ============================================================
@@ -179,245 +188,355 @@ def get_category(title):
 
     text = title.lower()
 
-    # WTI FIRST
-    if any(
-        word in text
-        for word in [
-            "wti",
-            "west texas intermediate",
-            "wti crude",
-            "us crude",
-            "crude oil",
-            "oil price",
-            "oil prices",
-            "oil supply",
-            "oil inventory",
-            "oil inventories",
-            "opec",
-            "eia",
-            "strait of hormuz",
-        ]
-    ):
-        return "🛢️ WTI / OIL"
+    if any(word in text for word in [
+        "nfp",
+        "nonfarm payroll",
+        "jobs report",
+        "unemployment",
+        "jobless",
+        "employment",
+    ]):
+        return "💼 Tenaga Kerja"
 
-    # GEOPOLITICAL
-    if any(
-        word in text
-        for word in [
-            "iran",
-            "israel",
-            "gaza",
-            "ukraine",
-            "russia",
-            "war",
-            "missile",
-            "attack",
-            "strike",
-            "military",
-            "ceasefire",
-            "sanctions",
-            "peace talks",
-        ]
-    ):
-        return "🌍 GEOPOLITICAL"
+    if any(word in text for word in [
+        "cpi",
+        "inflation",
+        "pce",
+        "ppi",
+    ]):
+        return "📊 Inflasi"
 
-    # FED / USD
-    if any(
-        word in text
-        for word in [
-            "fed",
-            "federal reserve",
-            "fomc",
-            "interest rate",
-            "rate cut",
-            "rate hike",
-            "cpi",
-            "nfp",
-            "nonfarm payroll",
-            "pce",
-            "ppi",
-            "treasury",
-            "yield",
-            "dxy",
-            "dollar",
-        ]
-    ):
-        return "🇺🇸 FED / USD"
-
-    # GOLD
-    if any(
-        word in text
-        for word in [
-            "gold",
-            "xauusd",
-            "bullion",
-        ]
-    ):
-        return "🥇 GOLD"
-
-    return "📰 MACRO"
-
-
-# ============================================================
-# IMPACT ANALYSIS
-# ============================================================
-
-def analyze_xauusd(title):
-
-    text = title.lower()
-
-    bullish = [
+    if any(word in text for word in [
+        "federal reserve",
+        "fomc",
+        "fed",
+        "interest rate",
         "rate cut",
-        "lower yields",
-        "falling yields",
-        "weak dollar",
-        "safe haven",
-        "risk off",
-        "war",
-        "attack",
-        "missile",
-        "escalation",
-        "sanctions",
-        "geopolitical",
+        "rate hike",
+        "hawkish",
+        "dovish",
+    ]):
+        return "🏦 Fed / Suku Bunga"
+
+    if any(word in text for word in [
+        "wti",
+        "west texas intermediate",
+        "wti crude",
+        "us crude",
+        "crude oil",
+        "oil price",
+        "oil prices",
+        "oil supply",
+        "oil inventory",
+        "oil inventories",
+        "opec",
+        "eia",
+        "strait of hormuz",
+    ]):
+        return "🛢️ WTI / Oil"
+
+    if any(word in text for word in [
         "iran",
         "israel",
         "gaza",
         "ukraine",
-    ]
+        "russia",
+        "war",
+        "missile",
+        "attack",
+        "strike",
+        "military",
+        "ceasefire",
+        "sanctions",
+        "peace talks",
+    ]):
+        return "🌍 Geopolitik"
 
-    bearish = [
-        "rate hike",
-        "higher yields",
-        "rising yields",
-        "strong dollar",
-        "hawkish fed",
-        "hawkish",
-        "strong jobs",
-        "hot cpi",
-        "higher inflation",
-    ]
+    if any(word in text for word in [
+        "treasury",
+        "yield",
+        "10-year yield",
+        "10 year yield",
+        "bond yields",
+    ]):
+        return "📈 US Treasury / Yield"
 
-    bullish_score = sum(
-        1 for word in bullish if word in text
-    )
+    if any(word in text for word in [
+        "dxy",
+        "dollar",
+        "usd",
+    ]):
+        return "💵 USD"
 
-    bearish_score = sum(
-        1 for word in bearish if word in text
-    )
+    if any(word in text for word in [
+        "gold",
+        "xauusd",
+        "bullion",
+    ]):
+        return "🥇 Gold"
 
-    if bullish_score > bearish_score:
-        return "🟢 BULLISH"
-
-    if bearish_score > bullish_score:
-        return "🔴 BEARISH"
-
-    return "🟡 MIXED"
+    return "🌐 Makro"
 
 
-def why_it_matters(title):
+# ============================================================
+# XAUUSD ANALYSIS
+# ============================================================
+
+def analyze_gold(title):
 
     text = title.lower()
 
-    if any(
-        word in text
-        for word in [
-            "iran",
-            "israel",
-            "gaza",
-            "war",
-            "missile",
-            "attack",
-            "strike",
-            "sanctions",
-            "geopolitical",
-        ]
-    ):
+    bullish_words = [
+        "gold rises",
+        "gold gains",
+        "gold advances",
+        "gold climbs",
+        "rate cut",
+        "dovish",
+        "weak dollar",
+        "dollar falls",
+        "falling yields",
+        "lower yields",
+        "safe haven",
+        "risk off",
+        "risk-off",
+        "war",
+        "attack",
+        "missile",
+        "strike",
+        "escalation",
+        "iran",
+        "israel",
+        "gaza",
+        "ukraine",
+        "sanctions",
+    ]
+
+    bearish_words = [
+        "gold falls",
+        "gold declines",
+        "gold drops",
+        "gold retreats",
+        "rate hike",
+        "hawkish",
+        "strong dollar",
+        "dollar rises",
+        "higher yields",
+        "rising yields",
+    ]
+
+    bullish = sum(
+        1 for word in bullish_words
+        if word in text
+    )
+
+    bearish = sum(
+        1 for word in bearish_words
+        if word in text
+    )
+
+    if bullish > bearish:
         return (
-            "Higher geopolitical risk can increase "
-            "safe-haven demand for Gold."
+            "🟢 Gold:\n"
+            "Berpotensi bullish. "
+            "Faktor berita mendukung permintaan Gold."
         )
 
-    if any(
-        word in text
-        for word in [
-            "fed",
-            "federal reserve",
-            "fomc",
-            "rate cut",
-            "rate hike",
-            "interest rate",
-        ]
-    ):
+    if bearish > bullish:
         return (
-            "Changes in Fed expectations can affect "
-            "USD, Treasury yields and the opportunity "
-            "cost of holding Gold."
-        )
-
-    if any(
-        word in text
-        for word in [
-            "cpi",
-            "inflation",
-            "pce",
-            "ppi",
-            "nfp",
-            "nonfarm payroll",
-        ]
-    ):
-        return (
-            "US macro data can change rate expectations, "
-            "USD and Treasury yields, which can strongly "
-            "affect Gold."
-        )
-
-    if any(
-        word in text
-        for word in [
-            "wti",
-            "crude oil",
-            "oil price",
-            "oil prices",
-            "opec",
-            "oil supply",
-            "oil inventory",
-            "eia",
-        ]
-    ):
-        return (
-            "WTI can influence inflation expectations "
-            "and risk sentiment, which can indirectly "
-            "affect Gold through USD and Treasury yields."
+            "🔴 Gold:\n"
+            "Berpotensi bearish. "
+            "Faktor berita dapat memberi tekanan pada Gold."
         )
 
     return (
-        "The event may affect risk sentiment, USD "
-        "or macro expectations relevant to Gold."
+        "🟡 Gold:\n"
+        "Potensi volatilitas tinggi. "
+        "Tunggu reaksi harga."
     )
 
 
 # ============================================================
-# GDELT
+# USD ANALYSIS
+# ============================================================
+
+def analyze_usd(title):
+
+    text = title.lower()
+
+    bearish = [
+        "weak dollar",
+        "dollar falls",
+        "dollar declines",
+        "rate cut",
+        "dovish",
+        "lower yields",
+        "falling yields",
+    ]
+
+    bullish = [
+        "strong dollar",
+        "dollar rises",
+        "rate hike",
+        "hawkish",
+        "higher yields",
+        "rising yields",
+    ]
+
+    bull = sum(
+        1 for word in bullish
+        if word in text
+    )
+
+    bear = sum(
+        1 for word in bearish
+        if word in text
+    )
+
+    if bear > bull:
+        return (
+            "🟢 USD:\n"
+            "Berpotensi melemah. "
+            "Kondisi ini dapat mendukung Gold."
+        )
+
+    if bull > bear:
+        return (
+            "🔴 USD:\n"
+            "Berpotensi menguat. "
+            "Kondisi ini dapat menekan Gold."
+        )
+
+    return (
+        "🟡 USD:\n"
+        "Perhatikan arah dolar "
+        "setelah rilis data/kebijakan."
+    )
+
+
+# ============================================================
+# YIELD ANALYSIS
+# ============================================================
+
+def analyze_yield(title):
+
+    text = title.lower()
+
+    if any(word in text for word in [
+        "higher yields",
+        "rising yields",
+        "10-year yield rises",
+        "treasury yield rises",
+    ]):
+        return (
+            "🔴 Yield:\n"
+            "Kenaikan yield dapat menekan Gold."
+        )
+
+    if any(word in text for word in [
+        "lower yields",
+        "falling yields",
+        "10-year yield falls",
+        "treasury yield falls",
+    ]):
+        return (
+            "🟢 Yield:\n"
+            "Penurunan yield dapat mendukung Gold."
+        )
+
+    return (
+        "🟡 Yield:\n"
+        "Perhatikan arah Treasury yield. "
+        "Kenaikan yield dapat menekan Gold."
+    )
+
+
+# ============================================================
+# OIL ANALYSIS
+# ============================================================
+
+def analyze_oil(title):
+
+    text = title.lower()
+
+    bullish = [
+        "wti rises",
+        "wti gains",
+        "wti climbs",
+        "oil rises",
+        "oil prices rise",
+        "crude rises",
+        "supply disruption",
+        "oil supply disruption",
+        "opec cut",
+        "production cut",
+        "strait of hormuz",
+    ]
+
+    bearish = [
+        "wti falls",
+        "wti declines",
+        "wti drops",
+        "oil falls",
+        "oil prices fall",
+        "crude falls",
+        "oversupply",
+        "production increase",
+        "opec increase",
+    ]
+
+    bull = sum(
+        1 for word in bullish
+        if word in text
+    )
+
+    bear = sum(
+        1 for word in bearish
+        if word in text
+    )
+
+    if bull > bear:
+        return (
+            "🟢 Oil:\n"
+            "WTI berpotensi menguat. "
+            "Perubahan minyak dapat meningkatkan "
+            "ekspektasi inflasi."
+        )
+
+    if bear > bull:
+        return (
+            "🔴 Oil:\n"
+            "WTI berpotensi melemah. "
+            "Perhatikan dampaknya terhadap ekspektasi inflasi."
+        )
+
+    return (
+        "🟡 Oil:\n"
+        "Perubahan WTI dapat mempengaruhi "
+        "ekspektasi inflasi."
+    )
+
+
+# ============================================================
+# ARTICLE FETCH
 # ============================================================
 
 async def get_news():
 
     queries = [
         "gold XAUUSD",
-        '"Federal Reserve" gold',
+        "Federal Reserve gold",
         "FOMC gold",
         "CPI inflation gold",
         "NFP gold",
         "Treasury yield gold",
         "DXY dollar gold",
 
-        # WTI
         "WTI crude oil",
-        '"West Texas Intermediate"',
+        "West Texas Intermediate",
         "OPEC WTI",
         "EIA oil inventory",
 
-        # GEO
         "Iran Israel gold",
         "West Asia oil",
         "geopolitical gold",
@@ -450,11 +569,6 @@ async def get_news():
                 ) as response:
 
                     if response.status != 200:
-
-                        logging.warning(
-                            f"GDELT {response.status}: {query}"
-                        )
-
                         continue
 
                     data = await response.json(
@@ -491,7 +605,7 @@ async def get_news():
 
                         score = calculate_score(title)
 
-                        if score < 50:
+                        if score < 60:
                             continue
 
                         articles.append({
@@ -500,16 +614,11 @@ async def get_news():
                             "domain": domain,
                             "date": date,
                             "score": score,
-                            "impact": classify(score),
-                            "category": get_category(title),
-                            "xau": analyze_xauusd(title),
-                            "why": why_it_matters(title),
                         })
 
             except Exception:
-
                 logging.exception(
-                    f"GDELT error: {query}"
+                    "GDELT ERROR"
                 )
 
     # ========================================================
@@ -527,25 +636,62 @@ async def get_news():
         ).strip()
 
         if normalized not in unique:
-
             unique[normalized] = article
 
         elif (
             article["score"]
             > unique[normalized]["score"]
         ):
-
             unique[normalized] = article
 
     articles = list(unique.values())
 
-    # Sort by score
     articles.sort(
         key=lambda x: x["score"],
         reverse=True,
     )
 
     return articles[:10]
+
+
+# ============================================================
+# FORMAT BREAKING NEWS
+# ============================================================
+
+def format_breaking_news(article):
+
+    title = article["title"]
+    score = article["score"]
+
+    category = get_category(title)
+    stars = get_stars(score)
+
+    gold = analyze_gold(title)
+    usd = analyze_usd(title)
+    yield_info = analyze_yield(title)
+    oil = analyze_oil(title)
+
+    message = (
+        "🚨 BREAKING NEWS\n\n"
+
+        f"📂 {category}\n\n"
+
+        f"📰 {title}\n\n"
+
+        f"⚠️ High Impact News {stars}\n"
+
+        f"{gold}\n"
+
+        f"{usd}\n"
+
+        f"{yield_info}\n"
+
+        f"{oil}\n"
+
+        f"🔗 {article['url']}"
+    )
+
+    return message
 
 
 # ============================================================
@@ -559,7 +705,7 @@ async def start(
 
     await update.message.reply_text(
         "🥇 XAUUSD Assistant aktif!\n\n"
-        "/news — berita XAUUSD + WTI\n"
+        "/news — Breaking News XAUUSD\n"
         "/status — status bot"
     )
 
@@ -571,10 +717,11 @@ async def status(
 
     await update.message.reply_text(
         "🟢 BOT ONLINE\n\n"
-        "Railway: OK\n"
         "News Engine: OK\n"
-        "XAUUSD Filter: ACTIVE\n"
-        "WTI Filter: ACTIVE"
+        "XAUUSD: ACTIVE\n"
+        "WTI: ACTIVE\n"
+        "USD: ACTIVE\n"
+        "Yield: ACTIVE"
     )
 
 
@@ -584,7 +731,7 @@ async def news(
 ):
 
     await update.message.reply_text(
-        "🔎 Menganalisis XAUUSD + WTI..."
+        "🔎 Mencari breaking news..."
     )
 
     try:
@@ -594,40 +741,15 @@ async def news(
         if not articles:
 
             await update.message.reply_text(
-                "❌ Tidak menemukan berita "
-                "yang relevan."
+                "❌ Tidak ada berita relevan."
             )
 
             return
 
-        message = (
-            "🥇 XAUUSD NEWS\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
+        # Kirim berita paling relevan
+        message = format_breaking_news(
+            articles[0]
         )
-
-        for article in articles:
-
-            message += (
-                f"{article['impact']} "
-                f"{article['category']}\n\n"
-
-                f"📰 {article['title']}\n\n"
-
-                f"🥇 XAUUSD: "
-                f"{article['xau']}\n\n"
-
-                f"💡 WHY IT MATTERS\n"
-                f"{article['why']}\n\n"
-
-                f"🏢 {article['domain']}\n"
-                f"🕐 {article['date']}\n"
-                f"📊 Relevance: "
-                f"{article['score']}\n\n"
-
-                f"🔗 {article['url']}\n\n"
-
-                "━━━━━━━━━━━━━━━━━━\n\n"
-            )
 
         await update.message.reply_text(
             message,
@@ -641,8 +763,7 @@ async def news(
         )
 
         await update.message.reply_text(
-            "❌ News Engine Error\n\n"
-            f"{str(e)[:500]}"
+            f"❌ News Engine Error\n\n{str(e)[:500]}"
         )
 
 
