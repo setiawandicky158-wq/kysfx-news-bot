@@ -3,11 +3,12 @@ import time
 import logging
 import requests
 
+from news import get_news, format_news
+
 from ff_calendar import (
     get_calendar_events,
-    format_calendar_event
+    format_calendar_event,
 )
-
 
 # ============================================================
 # CONFIG
@@ -20,10 +21,10 @@ CHECK_INTERVAL = int(
     os.getenv("CHECK_INTERVAL", "60")
 )
 
+# Event hanya dikirim jika waktunya <= 2 jam
 EVENT_ALERT_HOURS = float(
     os.getenv("EVENT_ALERT_HOURS", "2")
 )
-
 
 # ============================================================
 # LOGGING
@@ -35,7 +36,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
 
 # ============================================================
 # VALIDATE CONFIG
@@ -50,7 +50,6 @@ if not CHAT_ID:
     raise RuntimeError(
         "CHAT_ID belum diset di Railway Variables."
     )
-
 
 # ============================================================
 # TELEGRAM
@@ -104,7 +103,7 @@ def send_telegram(message):
 
     except Exception as e:
 
-        logger.exception(
+        logger.error(
             "Telegram unexpected error: %s",
             e
         )
@@ -126,14 +125,12 @@ def get_news_id(news):
     if link:
         return link
 
-    return (
-        news.get(
-            "title",
-            ""
-        )
-        .strip()
-        .lower()
-    )
+    title = news.get(
+        "title",
+        ""
+    ).strip().lower()
+
+    return title
 
 
 # ============================================================
@@ -146,15 +143,13 @@ def get_event_id(event):
         [
             event.get("event", ""),
             event.get("currency", ""),
-            str(
-                event.get("datetime", "")
-            ),
+            str(event.get("datetime", "")),
         ]
     )
 
 
 # ============================================================
-# CHECK NEWS
+# NEWS CHECK
 # ============================================================
 
 def check_news(sent_news):
@@ -201,7 +196,11 @@ def check_news(sent_news):
 
                 continue
 
-            if send_telegram(message):
+            success = send_telegram(
+                message
+            )
+
+            if success:
 
                 sent_news.add(
                     news_id
@@ -209,14 +208,20 @@ def check_news(sent_news):
 
                 logger.info(
                     "[NEWS] News sent: %s",
-                    news.get("title", "")
+                    news.get(
+                        "title",
+                        ""
+                    )
                 )
 
             else:
 
                 logger.error(
                     "[NEWS] Failed to send: %s",
-                    news.get("title", "")
+                    news.get(
+                        "title",
+                        ""
+                    )
                 )
 
     except Exception as e:
@@ -228,7 +233,7 @@ def check_news(sent_news):
 
 
 # ============================================================
-# CHECK GOLD EVENTS
+# GOLD CALENDAR CHECK
 # ============================================================
 
 def check_calendar(sent_events):
@@ -240,7 +245,7 @@ def check_calendar(sent_events):
     try:
 
         events = get_calendar_events(
-            hours_ahead=48
+            hours_ahead=EVENT_ALERT_HOURS
         )
 
         logger.info(
@@ -249,42 +254,6 @@ def check_calendar(sent_events):
         )
 
         for event in events:
-
-            event_datetime = event.get(
-                "datetime"
-            )
-
-            if not event_datetime:
-                continue
-
-            # ------------------------------------------------
-            # CALCULATE TIME TO EVENT
-            # ------------------------------------------------
-
-            from datetime import datetime
-            from zoneinfo import ZoneInfo
-
-            now = datetime.now(
-                ZoneInfo("Asia/Makassar")
-            )
-
-            seconds_to_event = (
-                event_datetime - now
-            ).total_seconds()
-
-            hours_to_event = (
-                seconds_to_event / 3600
-            )
-
-            # ------------------------------------------------
-            # ONLY ALERT WITHIN 2 HOURS
-            # ------------------------------------------------
-
-            if hours_to_event < 0:
-                continue
-
-            if hours_to_event > EVENT_ALERT_HOURS:
-                continue
 
             event_id = get_event_id(
                 event
@@ -295,10 +264,6 @@ def check_calendar(sent_events):
 
             if event_id in sent_events:
                 continue
-
-            # ------------------------------------------------
-            # FORMAT EVENT
-            # ------------------------------------------------
 
             try:
 
@@ -316,32 +281,35 @@ def check_calendar(sent_events):
 
                 continue
 
-            # ------------------------------------------------
-            # SEND TELEGRAM
-            # ------------------------------------------------
+            success = send_telegram(
+                message
+            )
 
-            if send_telegram(message):
+            if success:
 
                 sent_events.add(
                     event_id
                 )
 
                 logger.info(
-                    "[CALENDAR] Event alert sent: %s",
-                    event.get("event", "")
+                    "[CALENDAR] Event sent: %s",
+                    event.get(
+                        "event",
+                        ""
+                    )
                 )
 
             else:
 
                 logger.error(
-                    "[CALENDAR] Failed to send: %s",
-                    event.get("event", "")
+                    "[CALENDAR] Failed to send event: %s",
+                    event.get(
+                        "event",
+                        ""
+                    )
                 )
 
     except Exception as e:
-
-        # Calendar error tidak boleh
-        # menghentikan news bot.
 
         logger.exception(
             "[CALENDAR] Check error: %s",
@@ -350,41 +318,7 @@ def check_calendar(sent_events):
 
 
 # ============================================================
-# MEMORY CLEANUP
-# ============================================================
-
-def cleanup_memory(
-    sent_news,
-    sent_events
-):
-
-    if len(sent_news) > 1000:
-
-        old_news = list(
-            sent_news
-        )
-
-        sent_news.clear()
-
-        sent_news.update(
-            old_news[-500:]
-        )
-
-    if len(sent_events) > 500:
-
-        old_events = list(
-            sent_events
-        )
-
-        sent_events.clear()
-
-        sent_events.update(
-            old_events[-250:]
-        )
-
-
-# ============================================================
-# MAIN
+# MAIN LOOP
 # ============================================================
 
 def run():
@@ -403,7 +337,7 @@ def run():
     )
 
     logger.info(
-        "Event alert window: %s hours",
+        "Event alert window: %.1f hours",
         EVENT_ALERT_HOURS
     )
 
@@ -418,42 +352,49 @@ def run():
 
         try:
 
-            # =================================================
-            # BREAKING NEWS
-            # =================================================
+            # ------------------------------------------------
+            # NEWS
+            # ------------------------------------------------
 
             check_news(
                 sent_news
             )
 
-            # =================================================
-            # GOLD ECONOMIC EVENTS
-            # =================================================
+            # ------------------------------------------------
+            # GOLD ECONOMIC CALENDAR
+            # ------------------------------------------------
 
             check_calendar(
                 sent_events
             )
 
-            # =================================================
-            # MEMORY
-            # =================================================
+            # ------------------------------------------------
+            # MEMORY LIMIT
+            # ------------------------------------------------
 
-            cleanup_memory(
-                sent_news,
-                sent_events
+            if len(sent_news) > 1000:
+
+                sent_news = set(
+                    list(sent_news)[-500:]
+                )
+
+            if len(sent_events) > 500:
+
+                sent_events = set(
+                    list(sent_events)[-250:]
+                )
+
+            logger.info(
+                "Next check in %s seconds...",
+                CHECK_INTERVAL
             )
 
         except Exception as e:
 
             logger.exception(
-                "[MAIN] Main loop error: %s",
+                "Main loop error: %s",
                 e
             )
-
-        logger.info(
-            "Next check in %s seconds...",
-            CHECK_INTERVAL
-        )
 
         time.sleep(
             CHECK_INTERVAL
