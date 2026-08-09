@@ -6,8 +6,8 @@ import re
 
 
 BASE_URL = "https://investinglive.com"
-
 NEWS_URL = "https://investinglive.com/news/"
+
 
 HEADERS = {
     "User-Agent": (
@@ -36,6 +36,7 @@ GOLD_KEYWORDS = [
     "precious metals",
 ]
 
+
 USD_KEYWORDS = [
     "usd",
     "us dollar",
@@ -51,6 +52,7 @@ USD_KEYWORDS = [
     "rate hike",
 ]
 
+
 YIELD_KEYWORDS = [
     "yield",
     "yields",
@@ -62,7 +64,8 @@ YIELD_KEYWORDS = [
     "bond yield",
 ]
 
-# Oil + WTI = SATU kategori
+
+# OIL + WTI = SATU KATEGORI
 OIL_KEYWORDS = [
     "oil",
     "wti",
@@ -193,10 +196,83 @@ CATEGORY_KEYWORDS = {
 
 
 # ============================================================
-# HELPERS
+# TRANSLATION
+# ============================================================
+
+TRANSLATIONS = {
+    "non-farm payrolls": "NFP",
+    "nonfarm payrolls": "NFP",
+    "non-farm payroll": "NFP",
+    "nonfarm payroll": "NFP",
+
+    "employment report": "laporan ketenagakerjaan",
+    "unemployment rate": "tingkat pengangguran",
+    "jobless claims": "klaim pengangguran",
+
+    "rate hike": "kenaikan suku bunga",
+    "rate hikes": "kenaikan suku bunga",
+    "rate cut": "pemangkasan suku bunga",
+    "rate cuts": "pemangkasan suku bunga",
+
+    "interest rate": "suku bunga",
+    "interest rates": "suku bunga",
+
+    "inflation expectations": "ekspektasi inflasi",
+    "inflation": "inflasi",
+
+    "consumer prices": "harga konsumen",
+    "producer prices": "harga produsen",
+
+    "retail sales": "penjualan ritel",
+    "economic growth": "pertumbuhan ekonomi",
+
+    "US dollar": "dolar AS",
+    "dollar": "dolar AS",
+
+    "yields": "imbal hasil",
+    "yield": "imbal hasil",
+
+    "treasury yields": "imbal hasil Treasury",
+    "treasury yield": "imbal hasil Treasury",
+
+    "gold": "Gold",
+    "oil": "Oil",
+    "crude oil": "minyak mentah",
+
+    "expected": "yang diperkirakan",
+    "forecast": "perkiraan",
+    "actual": "aktual",
+
+    "higher than expected": "lebih tinggi dari perkiraan",
+    "lower than expected": "lebih rendah dari perkiraan",
+
+    "rises sharply": "naik tajam",
+    "rises": "naik",
+    "rose": "naik",
+
+    "falls sharply": "turun tajam",
+    "falls": "turun",
+    "fell": "turun",
+
+    "drops": "merosot",
+    "gains": "menguat",
+    "weakens": "melemah",
+    "strengthens": "menguat",
+
+    "advances": "menguat",
+    "declines": "melemah",
+
+    "week ahead": "agenda minggu depan",
+    "market news wrap": "ringkasan berita pasar",
+}
+
+
+# ============================================================
+# TEXT HELPERS
 # ============================================================
 
 def clean_text(text):
+
     if not text:
         return ""
 
@@ -214,6 +290,7 @@ def clean_text(text):
 
 
 def contains_keyword(text, keywords):
+
     text = text.lower()
 
     return any(
@@ -223,6 +300,7 @@ def contains_keyword(text, keywords):
 
 
 def normalize_url(url):
+
     if not url:
         return ""
 
@@ -237,11 +315,36 @@ def normalize_url(url):
     return url
 
 
+def translate_text(text):
+
+    if not text:
+        return text
+
+    result = text
+
+    # Frasa panjang diproses terlebih dahulu
+    for english, indonesian in sorted(
+        TRANSLATIONS.items(),
+        key=lambda x: len(x[0]),
+        reverse=True
+    ):
+
+        result = re.sub(
+            re.escape(english),
+            indonesian,
+            result,
+            flags=re.IGNORECASE
+        )
+
+    return result
+
+
 # ============================================================
 # CATEGORY
 # ============================================================
 
 def detect_category(text):
+
     text_lower = text.lower()
 
     for category, keywords in CATEGORY_KEYWORDS.items():
@@ -318,7 +421,7 @@ def calculate_impact(text):
 
 
 # ============================================================
-# DOWNLOAD ARTICLE
+# ARTICLE
 # ============================================================
 
 def get_article(url):
@@ -334,8 +437,8 @@ def get_article(url):
         if response.status_code != 200:
 
             print(
-                f"[ARTICLE] HTTP "
-                f"{response.status_code}: {url}"
+                "[ARTICLE] HTTP",
+                response.status_code
             )
 
             return ""
@@ -345,7 +448,6 @@ def get_article(url):
             "html.parser"
         )
 
-        # Hapus elemen yang bukan isi artikel
         for element in soup(
             [
                 "script",
@@ -357,9 +459,9 @@ def get_article(url):
                 "header",
             ]
         ):
+
             element.decompose()
 
-        # Prioritas selector artikel
         selectors = [
             "article",
             "[class*='article-body']",
@@ -391,7 +493,6 @@ def get_article(url):
                 ):
                     article_text = text
 
-        # Fallback
         if len(article_text) < 200:
 
             paragraphs = soup.find_all(
@@ -413,139 +514,16 @@ def get_article(url):
     except Exception as e:
 
         print(
-            f"[ARTICLE ERROR] "
-            f"{type(e).__name__}: {e}"
+            "[ARTICLE ERROR]",
+            type(e).__name__,
+            str(e)
         )
 
         return ""
 
 
 # ============================================================
-# EXTRACT MARKET SECTION
-# ============================================================
-
-def extract_market_data(text):
-
-    text_lower = text.lower()
-
-    gold = ""
-    usd = ""
-    yield_data = ""
-    oil = ""
-
-    # --------------------------------------------------------
-    # GOLD
-    # --------------------------------------------------------
-
-    gold_patterns = [
-        r"gold[^.]{0,180}",
-        r"gold[^,\n]{0,150}",
-    ]
-
-    for pattern in gold_patterns:
-
-        match = re.search(
-            pattern,
-            text,
-            re.IGNORECASE
-        )
-
-        if match:
-
-            gold = clean_text(
-                match.group(0)
-            )
-
-            break
-
-    # --------------------------------------------------------
-    # YIELD
-    # --------------------------------------------------------
-
-    yield_patterns = [
-        r"US 10-year yields?[^.]{0,180}",
-        r"10-year yields?[^.]{0,180}",
-        r"treasury yields?[^.]{0,180}",
-    ]
-
-    for pattern in yield_patterns:
-
-        match = re.search(
-            pattern,
-            text,
-            re.IGNORECASE
-        )
-
-        if match:
-
-            yield_data = clean_text(
-                match.group(0)
-            )
-
-            break
-
-    # --------------------------------------------------------
-    # WTI / OIL
-    # --------------------------------------------------------
-
-    oil_patterns = [
-        r"WTI[^.]{0,180}",
-        r"oil[^.]{0,180}",
-        r"crude oil[^.]{0,180}",
-    ]
-
-    for pattern in oil_patterns:
-
-        match = re.search(
-            pattern,
-            text,
-            re.IGNORECASE
-        )
-
-        if match:
-
-            oil = clean_text(
-                match.group(0)
-            )
-
-            break
-
-    # --------------------------------------------------------
-    # USD
-    # --------------------------------------------------------
-
-    usd_patterns = [
-        r"US dollar[^.]{0,180}",
-        r"USD[^.]{0,180}",
-        r"dollar[^.]{0,180}",
-    ]
-
-    for pattern in usd_patterns:
-
-        match = re.search(
-            pattern,
-            text,
-            re.IGNORECASE
-        )
-
-        if match:
-
-            usd = clean_text(
-                match.group(0)
-            )
-
-            break
-
-    return {
-        "gold": gold,
-        "usd": usd,
-        "yield": yield_data,
-        "oil": oil,
-    }
-
-
-# ============================================================
-# ANALYSIS
+# MARKET ANALYSIS
 # ============================================================
 
 def analyze_gold(text):
@@ -562,6 +540,7 @@ def analyze_gold(text):
         "gold advances",
         "gold rallies",
         "gold strengthens",
+        "gold jumps",
     ]
 
     bearish = [
@@ -580,6 +559,7 @@ def analyze_gold(text):
         x in lower
         for x in bullish
     ):
+
         return (
             "🟢 Gold berpotensi bullish. "
             "Tunggu konfirmasi price action."
@@ -589,22 +569,15 @@ def analyze_gold(text):
         x in lower
         for x in bearish
     ):
+
         return (
             "🔴 Gold berpotensi bearish. "
             "Tunggu konfirmasi price action."
         )
 
-    if contains_keyword(
-        text,
-        GOLD_KEYWORDS
-    ):
-        return (
-            "🟡 Potensi volatilitas tinggi. "
-            "Tunggu reaksi harga."
-        )
-
     return (
-        "Pantau dampaknya terhadap Gold."
+        "🟡 Potensi volatilitas tinggi. "
+        "Tunggu reaksi harga."
     )
 
 
@@ -621,6 +594,7 @@ def analyze_usd(text):
         "usd rises",
         "usd higher",
         "usd gains",
+        "dollar jumps",
     ]
 
     bearish = [
@@ -638,6 +612,7 @@ def analyze_usd(text):
         x in lower
         for x in bullish
     ):
+
         return (
             "🟢 USD menguat. "
             "Berpotensi memberi tekanan pada Gold."
@@ -647,14 +622,15 @@ def analyze_usd(text):
         x in lower
         for x in bearish
     ):
+
         return (
             "🔴 USD melemah. "
             "Berpotensi mendukung Gold."
         )
 
     return (
-        "Perhatikan arah dolar setelah "
-        "rilis data/kebijakan."
+        "Perhatikan arah dolar "
+        "setelah rilis data atau kebijakan."
     )
 
 
@@ -684,6 +660,7 @@ def analyze_yield(text):
         x in lower
         for x in bullish
     ):
+
         return (
             "🔴 Kenaikan yield dapat "
             "menekan Gold."
@@ -693,6 +670,7 @@ def analyze_yield(text):
         x in lower
         for x in bearish
     ):
+
         return (
             "🟢 Penurunan yield dapat "
             "mendukung Gold."
@@ -738,6 +716,7 @@ def analyze_oil(text):
         x in lower
         for x in bullish
     ):
+
         return (
             "🟢 Oil/WTI berpotensi bullish. "
             "Tunggu konfirmasi harga."
@@ -747,6 +726,7 @@ def analyze_oil(text):
         x in lower
         for x in bearish
     ):
+
         return (
             "🔴 Oil/WTI berpotensi bearish. "
             "Tunggu konfirmasi harga."
@@ -756,6 +736,7 @@ def analyze_oil(text):
         text,
         OIL_KEYWORDS
     ):
+
         return (
             "🟡 Perubahan Oil/WTI dapat "
             "mempengaruhi ekspektasi inflasi."
@@ -767,7 +748,7 @@ def analyze_oil(text):
 
 
 # ============================================================
-# NEWS LIST
+# GET NEWS
 # ============================================================
 
 def get_news(limit=10):
@@ -785,8 +766,8 @@ def get_news(limit=10):
         )
 
         print(
-            f"[NEWS] HTTP Status: "
-            f"{response.status_code}"
+            "[NEWS] HTTP Status:",
+            response.status_code
         )
 
         if response.status_code != 200:
@@ -800,8 +781,9 @@ def get_news(limit=10):
     except Exception as e:
 
         print(
-            f"[NEWS ERROR] "
-            f"{type(e).__name__}: {e}"
+            "[NEWS ERROR]",
+            type(e).__name__,
+            str(e)
         )
 
         return []
@@ -836,14 +818,10 @@ def get_news(limit=10):
         if "/news/" not in href:
             continue
 
-        # Hindari duplicate
         if href in seen:
             continue
 
         seen.add(href)
-
-        # Filter market relevance
-        title_lower = title.lower()
 
         relevant = (
             contains_keyword(
@@ -872,7 +850,8 @@ def get_news(limit=10):
             continue
 
         print(
-            f"[NEWS] Reading: {title}"
+            "[NEWS] Reading:",
+            title
         )
 
         article = get_article(
@@ -880,7 +859,7 @@ def get_news(limit=10):
         )
 
         full_text = (
-            f"{title} {article}"
+            title + " " + article
         )
 
         impact, stars = calculate_impact(
@@ -891,21 +870,20 @@ def get_news(limit=10):
             full_text
         )
 
-        market = extract_market_data(
-            full_text
-        )
-
         news_id = hashlib.sha256(
             href.encode("utf-8")
         ).hexdigest()
 
         result = {
-
             "id": news_id,
 
-            "title": title,
+            "title": translate_text(
+                title
+            ),
 
-            "summary": article[:1000],
+            "summary": translate_text(
+                article[:1000]
+            ),
 
             "link": href,
 
@@ -914,14 +892,6 @@ def get_news(limit=10):
             "impact": impact,
 
             "stars": stars,
-
-            "gold_data": market["gold"],
-
-            "usd_data": market["usd"],
-
-            "yield_data": market["yield"],
-
-            "oil_data": market["oil"],
 
             "gold": analyze_gold(
                 full_text
@@ -948,8 +918,8 @@ def get_news(limit=10):
             break
 
     print(
-        f"[NEWS] Relevant articles: "
-        f"{len(results)}"
+        "[NEWS] Relevant articles:",
+        len(results)
     )
 
     return results
@@ -961,15 +931,12 @@ def get_news(limit=10):
 
 def format_news(news):
 
-    link = news.get(
-        "link",
-        ""
-    )
-
     return (
         "🚨 <b>BREAKING NEWS</b>\n"
-        f"📂 {news['category']}\n"
-        f"📰 {news['title']}\n"
+        f"📂 {news['category']}\n\n"
+
+        f"📰 <b>{news['title']}</b>\n\n"
+
         f"⚠️ <b>{news['impact']}</b> "
         f"{news['stars']}\n\n"
 
@@ -985,7 +952,7 @@ def format_news(news):
         f"🛢️ <b>Oil:</b>\n"
         f"{news['oil']}\n\n"
 
-        f"🔗 <a href=\"{link}\">"
+        f"🔗 <a href=\"{news['link']}\">"
         "Sumber berita"
         "</a>"
     )
