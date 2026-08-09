@@ -76,6 +76,7 @@ def send_telegram(message):
         data = response.json()
 
         if not data.get("ok"):
+
             logger.error(
                 "Telegram error: %s",
                 data
@@ -85,10 +86,19 @@ def send_telegram(message):
 
         return True
 
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
 
         logger.error(
             "Telegram request error: %s",
+            e
+        )
+
+        return False
+
+    except Exception as e:
+
+        logger.error(
+            "Telegram unexpected error: %s",
             e
         )
 
@@ -101,16 +111,20 @@ def send_telegram(message):
 
 def get_news_id(news):
 
-    link = news.get("link", "").strip()
+    link = news.get(
+        "link",
+        ""
+    ).strip()
 
     if link:
         return link
 
-    return (
-        news.get("title", "")
-        .strip()
-        .lower()
-    )
+    title = news.get(
+        "title",
+        ""
+    ).strip().lower()
+
+    return title
 
 
 # ============================================================
@@ -155,9 +169,9 @@ def run():
                 len(news_list)
             )
 
-            # ------------------------------------------------
+            # ====================================================
             # SEND ONLY NEW NEWS
-            # ------------------------------------------------
+            # ====================================================
 
             for news in reversed(news_list):
 
@@ -168,12 +182,24 @@ def run():
                 if not news_id:
                     continue
 
+                # Jangan kirim berita yang sudah pernah dikirim
                 if news_id in sent_news:
                     continue
 
-                message = format_news(
-                    news
-                )
+                try:
+
+                    message = format_news(
+                        news
+                    )
+
+                except Exception as e:
+
+                    logger.error(
+                        "Format news error: %s",
+                        e
+                    )
+
+                    continue
 
                 success = send_telegram(
                     message
@@ -187,12 +213,19 @@ def run():
 
                     logger.info(
                         "News sent: %s",
-                        news.get("title")
+                        news.get("title", "")
                     )
 
-            # ------------------------------------------------
+                else:
+
+                    logger.error(
+                        "Failed to send news: %s",
+                        news.get("title", "")
+                    )
+
+            # ====================================================
             # MEMORY LIMIT
-            # ------------------------------------------------
+            # ====================================================
 
             if len(sent_news) > 1000:
 
@@ -206,6 +239,10 @@ def run():
                 "Main loop error: %s",
                 e
             )
+
+        # ========================================================
+        # WAIT
+        # ========================================================
 
         time.sleep(
             CHECK_INTERVAL
