@@ -6,7 +6,7 @@ import html
 
 
 # ============================================================
-# NEWS SOURCES
+# RSS NEWS SOURCES
 # ============================================================
 
 RSS_FEEDS = {
@@ -22,12 +22,16 @@ RSS_FEEDS = {
         "https://www.cnbc.com/id/19832390/device/rss/rss.html",
     ],
 
-    "CNBC Earnings": [
+    "CNBC Markets": [
         "https://www.cnbc.com/id/15839135/device/rss/rss.html",
     ],
 
     "MarketWatch": [
         "https://feeds.marketwatch.com/marketwatch/topstories/",
+    ],
+
+    "MarketWatch MarketPulse": [
+        "https://feeds.marketwatch.com/marketwatch/marketpulse/",
     ],
 }
 
@@ -38,126 +42,251 @@ RSS_FEEDS = {
 
 KEYWORDS = {
 
+    # --------------------------------------------------------
     # GOLD / XAUUSD
-    "gold": 100,
-    "xauusd": 140,
-    "gold price": 110,
-    "gold prices": 110,
-    "gold futures": 100,
-    "bullion": 80,
+    # --------------------------------------------------------
 
+    "gold": 100,
+    "xauusd": 150,
+    "xau/usd": 150,
+    "gold price": 120,
+    "gold prices": 120,
+    "gold futures": 110,
+    "bullion": 90,
+    "precious metal": 80,
+    "precious metals": 80,
+
+    # --------------------------------------------------------
     # FED
-    "federal reserve": 120,
-    "fomc": 130,
+    # --------------------------------------------------------
+
+    "federal reserve": 130,
+    "fomc": 140,
     "fed": 80,
     "interest rate": 110,
     "interest rates": 110,
-    "rate cut": 120,
-    "rate hike": 120,
-    "hawkish": 110,
-    "dovish": 110,
+    "rate cut": 130,
+    "rate cuts": 130,
+    "rate hike": 130,
+    "rate hikes": 130,
+    "hawkish": 120,
+    "dovish": 120,
+    "jerome powell": 130,
+    "powell": 100,
 
-    # US DATA
-    "nfp": 140,
-    "nonfarm payroll": 140,
-    "jobs report": 120,
+    # --------------------------------------------------------
+    # US ECONOMIC DATA
+    # --------------------------------------------------------
+
+    "nfp": 150,
+    "nonfarm payroll": 150,
+    "non-farm payroll": 150,
+    "jobs report": 130,
+    "employment report": 130,
     "employment": 80,
-    "unemployment": 100,
-    "jobless claims": 100,
-    "cpi": 130,
-    "inflation": 110,
-    "pce": 130,
-    "ppi": 100,
-    "retail sales": 80,
-    "gdp": 80,
+    "unemployment": 110,
+    "unemployment rate": 120,
+    "jobless claims": 120,
+    "initial jobless claims": 120,
 
-    # USD
-    "us dollar": 100,
+    "cpi": 140,
+    "consumer price index": 140,
+    "inflation": 120,
+    "inflation data": 130,
+
+    "pce": 140,
+    "core pce": 150,
+    "personal consumption expenditures": 140,
+
+    "ppi": 120,
+    "producer price index": 120,
+
+    "retail sales": 100,
+    "gdp": 90,
+    "economic growth": 80,
+
+    # --------------------------------------------------------
+    # USD / DXY
+    # --------------------------------------------------------
+
+    "us dollar": 110,
+    "u.s. dollar": 110,
     "dollar": 60,
-    "usd": 60,
-    "dxy": 120,
+    "usd": 70,
+    "dxy": 130,
+    "dollar index": 130,
 
-    # YIELD
-    "treasury yield": 120,
-    "treasury yields": 120,
-    "10-year yield": 130,
-    "10 year yield": 130,
-    "bond yields": 100,
+    "dollar rises": 100,
+    "dollar gains": 100,
+    "dollar falls": 100,
+    "dollar weakens": 100,
+    "dollar strengthens": 100,
 
+    # --------------------------------------------------------
+    # TREASURY / YIELD
+    # --------------------------------------------------------
+
+    "treasury yield": 130,
+    "treasury yields": 130,
+    "treasury": 80,
+
+    "10-year yield": 140,
+    "10 year yield": 140,
+    "10-year treasury": 130,
+    "10 year treasury": 130,
+
+    "bond yields": 110,
+    "bond yield": 110,
+    "yields rise": 110,
+    "yields fall": 110,
+    "rising yields": 120,
+    "falling yields": 120,
+    "higher yields": 120,
+    "lower yields": 120,
+
+    # --------------------------------------------------------
     # WTI / OIL
-    "wti": 140,
-    "wti crude": 140,
-    "west texas intermediate": 140,
+    # --------------------------------------------------------
+
+    "wti": 150,
+    "wti crude": 150,
+    "west texas intermediate": 150,
+
     "crude oil": 120,
-    "oil price": 100,
-    "oil prices": 100,
-    "oil supply": 110,
-    "oil inventory": 120,
-    "oil inventories": 120,
-    "eia": 110,
-    "opec": 120,
-    "opec+": 130,
+    "crude prices": 110,
+    "crude price": 110,
 
+    "oil price": 110,
+    "oil prices": 110,
+
+    "oil rises": 110,
+    "oil gains": 110,
+    "oil climbs": 110,
+    "oil falls": 110,
+    "oil drops": 110,
+    "oil declines": 110,
+
+    "oil supply": 120,
+    "oil demand": 100,
+    "oil inventory": 130,
+    "oil inventories": 130,
+
+    "eia": 120,
+    "opec": 130,
+    "opec+": 140,
+    "production cut": 130,
+    "production cuts": 130,
+    "production increase": 100,
+
+    # --------------------------------------------------------
     # GEOPOLITICAL
-    "iran": 120,
-    "israel": 100,
-    "gaza": 100,
-    "ukraine": 90,
-    "russia": 80,
-    "war": 100,
-    "missile": 110,
-    "attack": 100,
-    "strike": 100,
-    "military": 90,
-    "ceasefire": 100,
-    "sanctions": 100,
-    "peace talks": 80,
-    "geopolitical": 90,
-    "hormuz": 140,
-    "strait of hormuz": 150,
+    # --------------------------------------------------------
 
-    # RISK
-    "safe haven": 110,
-    "risk off": 110,
-    "risk-off": 110,
-    "market turmoil": 100,
-    "market volatility": 80,
+    "iran": 130,
+    "israel": 110,
+    "gaza": 110,
+    "hamas": 100,
+
+    "ukraine": 100,
+    "russia": 90,
+
+    "war": 110,
+    "war risk": 120,
+
+    "missile": 120,
+    "missiles": 120,
+
+    "attack": 110,
+    "attacks": 110,
+
+    "strike": 110,
+    "strikes": 110,
+
+    "military": 100,
+    "military action": 120,
+
+    "ceasefire": 110,
+    "peace talks": 90,
+    "peace deal": 100,
+
+    "sanctions": 110,
+
+    "geopolitical": 100,
+    "geopolitical tensions": 120,
+
+    "middle east": 110,
+    "west asia": 110,
+
+    "hormuz": 150,
+    "strait of hormuz": 160,
+
+    # --------------------------------------------------------
+    # RISK SENTIMENT
+    # --------------------------------------------------------
+
+    "safe haven": 120,
+    "safe-haven": 120,
+
+    "risk off": 120,
+    "risk-off": 120,
+
+    "market turmoil": 110,
+    "market volatility": 90,
+
+    "global markets": 60,
 }
 
 
 # ============================================================
-# FALSE POSITIVE FILTER
+# EXCLUDE IRRELEVANT CONTENT
 # ============================================================
 
 EXCLUDE = [
+
     "football",
     "soccer",
     "basketball",
     "tennis",
     "judo",
     "taekwondo",
+
     "movie",
     "film",
+    "cinema",
     "music",
     "singer",
     "celebrity",
+    "actor",
+    "actress",
+
     "fashion",
     "handbag",
+    "luxury",
+
     "restaurant",
+    "food",
+    "cooking",
+
     "real estate",
     "housing",
+    "property market",
+
     "wedding",
     "tourism",
+    "travel",
+
+    "video game",
+    "gaming",
 ]
 
 
 # ============================================================
-# SCORE
+# SCORE ARTICLE
 # ============================================================
 
-def calculate_score(title):
+def calculate_score(text):
 
-    text = title.lower()
+    text = text.lower()
 
     score = 0
 
@@ -182,90 +311,129 @@ def get_category(title):
 
     text = title.lower()
 
+    # Employment
     if any(x in text for x in [
         "nfp",
         "nonfarm payroll",
+        "non-farm payroll",
         "jobs report",
+        "employment report",
         "employment",
         "unemployment",
         "jobless claims",
     ]):
         return "💼 Tenaga Kerja"
 
+    # Inflation
     if any(x in text for x in [
         "cpi",
+        "consumer price index",
         "inflation",
         "pce",
+        "core pce",
         "ppi",
+        "producer price index",
     ]):
         return "📊 Inflasi"
 
+    # Fed
     if any(x in text for x in [
         "federal reserve",
         "fomc",
         "fed",
         "interest rate",
+        "interest rates",
         "rate cut",
+        "rate cuts",
         "rate hike",
+        "rate hikes",
         "hawkish",
         "dovish",
+        "jerome powell",
+        "powell",
     ]):
         return "🏦 Fed / Suku Bunga"
 
+    # Oil
     if any(x in text for x in [
         "wti",
         "wti crude",
         "west texas intermediate",
         "crude oil",
+        "crude price",
+        "crude prices",
         "oil price",
         "oil prices",
         "oil supply",
+        "oil demand",
         "oil inventory",
         "oil inventories",
         "opec",
         "eia",
         "hormuz",
+        "strait of hormuz",
     ]):
         return "🛢️ WTI / Oil"
 
+    # Geopolitical
     if any(x in text for x in [
         "iran",
         "israel",
         "gaza",
+        "hamas",
         "ukraine",
         "russia",
         "war",
         "missile",
+        "missiles",
         "attack",
+        "attacks",
         "strike",
+        "strikes",
         "military",
         "ceasefire",
-        "sanctions",
         "peace talks",
+        "peace deal",
+        "sanctions",
         "geopolitical",
+        "middle east",
+        "west asia",
+        "hormuz",
+        "strait of hormuz",
     ]):
         return "🌍 Geopolitik"
 
+    # Yield
     if any(x in text for x in [
         "treasury",
         "yield",
+        "yields",
         "10-year",
         "10 year",
         "bond yield",
+        "bond yields",
     ]):
         return "📈 US Treasury / Yield"
 
+    # USD
     if any(x in text for x in [
         "dxy",
+        "dollar index",
         "dollar",
         "usd",
+        "u.s. dollar",
+        "us dollar",
     ]):
         return "💵 USD"
 
+    # Gold
     if any(x in text for x in [
         "gold",
         "xauusd",
+        "xau/usd",
         "bullion",
+        "precious metal",
+        "precious metals",
     ]):
         return "🥇 Gold"
 
@@ -278,23 +446,23 @@ def get_category(title):
 
 def get_impact(score):
 
-    if score >= 220:
+    if score >= 300:
         return "High Impact News ⭐⭐⭐⭐⭐"
 
-    if score >= 160:
+    if score >= 220:
         return "High Impact News ⭐⭐⭐⭐"
 
-    if score >= 110:
+    if score >= 140:
         return "Medium Impact News ⭐⭐⭐"
 
-    if score >= 70:
+    if score >= 80:
         return "Low Impact News ⭐⭐"
 
     return "Low Impact News ⭐"
 
 
 # ============================================================
-# GOLD
+# GOLD ANALYSIS
 # ============================================================
 
 def analyze_gold(title):
@@ -302,40 +470,65 @@ def analyze_gold(title):
     text = title.lower()
 
     bullish = [
+
         "gold rises",
         "gold gains",
         "gold advances",
         "gold climbs",
+
         "rate cut",
+        "rate cuts",
+
         "dovish",
+
         "weak dollar",
         "dollar falls",
+        "dollar weakens",
+
         "falling yields",
         "lower yields",
+
         "safe haven",
+        "safe-haven",
+
         "risk off",
         "risk-off",
+
         "war",
         "attack",
+        "attacks",
         "missile",
+        "missiles",
         "strike",
+        "strikes",
+
         "iran",
         "israel",
         "gaza",
         "ukraine",
+
         "sanctions",
+
         "hormuz",
+        "strait of hormuz",
     ]
 
     bearish = [
+
         "gold falls",
         "gold declines",
         "gold drops",
         "gold retreats",
+
         "rate hike",
+        "rate hikes",
+
         "hawkish",
+
         "strong dollar",
         "dollar rises",
+        "dollar strengthens",
+
         "higher yields",
         "rising yields",
     ]
@@ -351,6 +544,7 @@ def analyze_gold(title):
     )
 
     if bull > bear:
+
         return (
             "🟢 Gold:\n"
             "Berpotensi bullish. Faktor berita "
@@ -358,6 +552,7 @@ def analyze_gold(title):
         )
 
     if bear > bull:
+
         return (
             "🔴 Gold:\n"
             "Berpotensi bearish. Faktor berita "
@@ -372,7 +567,7 @@ def analyze_gold(title):
 
 
 # ============================================================
-# USD
+# USD ANALYSIS
 # ============================================================
 
 def analyze_usd(title):
@@ -380,20 +575,35 @@ def analyze_usd(title):
     text = title.lower()
 
     bearish = [
+
         "weak dollar",
         "dollar falls",
         "dollar declines",
+        "dollar weakens",
+
         "rate cut",
+        "rate cuts",
+
         "dovish",
+
         "lower yields",
+        "falling yields",
     ]
 
     bullish = [
+
         "strong dollar",
         "dollar rises",
+        "dollar gains",
+        "dollar strengthens",
+
         "rate hike",
+        "rate hikes",
+
         "hawkish",
+
         "higher yields",
+        "rising yields",
     ]
 
     bear = sum(
@@ -407,6 +617,7 @@ def analyze_usd(title):
     )
 
     if bear > bull:
+
         return (
             "🟢 USD:\n"
             "Berpotensi melemah. Kondisi ini "
@@ -414,6 +625,7 @@ def analyze_usd(title):
         )
 
     if bull > bear:
+
         return (
             "🔴 USD:\n"
             "Berpotensi menguat. Kondisi ini "
@@ -428,7 +640,7 @@ def analyze_usd(title):
 
 
 # ============================================================
-# YIELD
+# YIELD ANALYSIS
 # ============================================================
 
 def analyze_yield(title):
@@ -440,7 +652,10 @@ def analyze_yield(title):
         "rising yields",
         "yield rises",
         "yields rise",
+        "yield climbs",
+        "yields climb",
     ]):
+
         return (
             "🔴 Yield:\n"
             "Kenaikan yield dapat menekan Gold."
@@ -451,7 +666,10 @@ def analyze_yield(title):
         "falling yields",
         "yield falls",
         "yields fall",
+        "yield declines",
+        "yields decline",
     ]):
+
         return (
             "🟢 Yield:\n"
             "Penurunan yield dapat mendukung Gold."
@@ -465,7 +683,7 @@ def analyze_yield(title):
 
 
 # ============================================================
-# OIL / WTI
+# WTI / OIL ANALYSIS
 # ============================================================
 
 def analyze_oil(title):
@@ -473,30 +691,61 @@ def analyze_oil(title):
     text = title.lower()
 
     bullish = [
+
         "wti rises",
         "wti gains",
         "wti climbs",
+
         "oil rises",
+        "oil gains",
+        "oil climbs",
+
         "oil prices rise",
+        "oil price rises",
+
         "crude rises",
+        "crude gains",
+        "crude climbs",
+
         "supply disruption",
+        "supply disruptions",
+
         "oil supply disruption",
+
         "opec cut",
+        "opec cuts",
+
         "production cut",
+        "production cuts",
+
         "strait of hormuz",
         "hormuz",
     ]
 
     bearish = [
+
         "wti falls",
         "wti declines",
         "wti drops",
+
         "oil falls",
+        "oil declines",
+        "oil drops",
+
         "oil prices fall",
+        "oil price falls",
+
         "crude falls",
+        "crude declines",
+        "crude drops",
+
         "oversupply",
+
         "production increase",
+        "production increases",
+
         "opec increase",
+        "opec increases",
     ]
 
     bull = sum(
@@ -510,6 +759,7 @@ def analyze_oil(title):
     )
 
     if bull > bear:
+
         return (
             "🟢 Oil:\n"
             "WTI berpotensi menguat. Perubahan "
@@ -517,6 +767,7 @@ def analyze_oil(title):
         )
 
     if bear > bull:
+
         return (
             "🔴 Oil:\n"
             "WTI berpotensi melemah. Perhatikan "
@@ -531,7 +782,7 @@ def analyze_oil(title):
 
 
 # ============================================================
-# DUPLICATE NORMALIZATION
+# NORMALIZE TITLE
 # ============================================================
 
 def normalize_title(title):
@@ -544,31 +795,43 @@ def normalize_title(title):
 
 
 # ============================================================
-# FETCH ONE RSS
+# FETCH RSS
 # ============================================================
 
-async def fetch_feed(session, source, url):
+async def fetch_feed(
+    session,
+    source,
+    feed_url
+):
 
     try:
 
         async with session.get(
-            url,
-            timeout=aiohttp.ClientTimeout(total=15),
+            feed_url,
+            timeout=aiohttp.ClientTimeout(
+                total=15
+            ),
             headers={
                 "User-Agent":
-                "XAUUSD-Assistant/1.0"
+                "Mozilla/5.0 "
+                "(XAUUSD Assistant)"
             },
         ) as response:
 
             if response.status != 200:
+
                 print(
-                    f"{source} RSS HTTP {response.status}"
+                    f"[RSS] {source}: "
+                    f"HTTP {response.status}"
                 )
+
                 return []
 
             content = await response.text()
 
-            feed = feedparser.parse(content)
+            feed = feedparser.parse(
+                content
+            )
 
             results = []
 
@@ -586,6 +849,14 @@ async def fetch_feed(session, source, url):
                     or ""
                 ).strip()
 
+                description = html.unescape(
+                    (
+                        entry.get("summary")
+                        or entry.get("description")
+                        or ""
+                    ).strip()
+                )
+
                 published = (
                     entry.get("published")
                     or entry.get("updated")
@@ -595,8 +866,20 @@ async def fetch_feed(session, source, url):
                 if not title or not url:
                     continue
 
-                score = calculate_score(title)
+                # --------------------------------------------
+                # ANALYZE TITLE + DESCRIPTION
+                # --------------------------------------------
 
+                searchable_text = (
+                    f"{title} "
+                    f"{description}"
+                )
+
+                score = calculate_score(
+                    searchable_text
+                )
+
+                # Minimum relevance
                 if score < 70:
                     continue
 
@@ -605,15 +888,21 @@ async def fetch_feed(session, source, url):
                     "url": url,
                     "source": source,
                     "published": published,
+                    "description": description,
                     "score": score,
                 })
+
+            print(
+                f"[RSS] {source}: "
+                f"{len(results)} relevant"
+            )
 
             return results
 
     except Exception as e:
 
         print(
-            f"{source} RSS ERROR: {e}"
+            f"[RSS ERROR] {source}: {e}"
         )
 
         return []
@@ -656,8 +945,14 @@ async def get_news():
 
         for result in results:
 
-            if isinstance(result, list):
-                articles.extend(result)
+            if isinstance(
+                result,
+                list
+            ):
+
+                articles.extend(
+                    result
+                )
 
     # ========================================================
     # DEDUPLICATE
@@ -670,6 +965,9 @@ async def get_news():
         key = normalize_title(
             article["title"]
         )
+
+        if not key:
+            continue
 
         if key not in unique:
 
@@ -686,11 +984,16 @@ async def get_news():
         unique.values()
     )
 
+    # ========================================================
+    # SORT BY IMPACT
+    # ========================================================
+
     articles.sort(
         key=lambda x: x["score"],
         reverse=True,
     )
 
+    # Maximum 20
     return articles[:20]
 
 
@@ -702,16 +1005,29 @@ def format_breaking_news(article):
 
     title = article["title"]
 
-    category = get_category(title)
+    category = get_category(
+        title
+    )
 
     impact = get_impact(
         article["score"]
     )
 
-    gold = analyze_gold(title)
-    usd = analyze_usd(title)
-    yield_info = analyze_yield(title)
-    oil = analyze_oil(title)
+    gold = analyze_gold(
+        title
+    )
+
+    usd = analyze_usd(
+        title
+    )
+
+    yield_info = analyze_yield(
+        title
+    )
+
+    oil = analyze_oil(
+        title
+    )
 
     return (
         "🚨 BREAKING NEWS\n\n"
