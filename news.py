@@ -1,39 +1,95 @@
- import asyncio
+import asyncio
 import aiohttp
 import feedparser
 import re
 import html
+from urllib.parse import quote
 
 
 # ============================================================
-# RSS NEWS SOURCES
+# XAUUSD NEWS ENGINE
+# No GDELT
+# ============================================================
+
+
+# ============================================================
+# DIRECT RSS SOURCES
 # ============================================================
 
 RSS_FEEDS = {
-    "CNBC Economy": [
+
+    "CNBC Economy":
         "https://www.cnbc.com/id/20910258/device/rss/rss.html",
-    ],
 
-    "CNBC Energy": [
+    "CNBC Energy":
         "https://www.cnbc.com/id/19836768/device/rss/rss.html",
-    ],
 
-    "CNBC Asia": [
+    "CNBC Asia":
         "https://www.cnbc.com/id/19832390/device/rss/rss.html",
-    ],
 
-    "CNBC Markets": [
+    "CNBC Markets":
         "https://www.cnbc.com/id/15839135/device/rss/rss.html",
-    ],
 
-    "MarketWatch": [
+    "MarketWatch":
         "https://feeds.marketwatch.com/marketwatch/topstories/",
-    ],
 
-    "MarketWatch MarketPulse": [
+    "MarketWatch MarketPulse":
         "https://feeds.marketwatch.com/marketwatch/marketpulse/",
-    ],
 }
+
+
+# ============================================================
+# GOOGLE NEWS RSS SEARCH
+# ============================================================
+
+GOOGLE_NEWS_QUERIES = [
+
+    "XAUUSD gold price",
+
+    "gold Federal Reserve",
+
+    "gold Fed FOMC",
+
+    "gold CPI inflation",
+
+    "gold NFP employment",
+
+    "gold US dollar DXY",
+
+    "gold Treasury yield",
+
+    "gold interest rates",
+
+    "WTI crude oil",
+
+    "WTI oil OPEC",
+
+    "oil prices",
+
+    "oil inventory EIA",
+
+    "Iran Israel",
+
+    "Middle East tensions",
+
+    "Strait of Hormuz",
+
+    "geopolitical gold",
+
+]
+
+
+def google_news_url(query):
+
+    encoded = quote(query)
+
+    return (
+        "https://news.google.com/rss/search?"
+        f"q={encoded}"
+        "&hl=en-US"
+        "&gl=US"
+        "&ceid=US:en"
+    )
 
 
 # ============================================================
@@ -43,202 +99,222 @@ RSS_FEEDS = {
 KEYWORDS = {
 
     # --------------------------------------------------------
-    # GOLD / XAUUSD
+    # GOLD
     # --------------------------------------------------------
 
     "gold": 100,
-    "xauusd": 150,
-    "xau/usd": 150,
-    "gold price": 120,
-    "gold prices": 120,
-    "gold futures": 110,
+    "xauusd": 180,
+    "xau/usd": 180,
+    "gold price": 130,
+    "gold prices": 130,
+    "gold futures": 120,
+    "gold market": 100,
     "bullion": 90,
-    "precious metal": 80,
-    "precious metals": 80,
+    "precious metal": 90,
+    "precious metals": 90,
 
     # --------------------------------------------------------
     # FED
     # --------------------------------------------------------
 
-    "federal reserve": 130,
-    "fomc": 140,
+    "federal reserve": 140,
+    "fomc": 150,
     "fed": 80,
-    "interest rate": 110,
-    "interest rates": 110,
-    "rate cut": 130,
-    "rate cuts": 130,
-    "rate hike": 130,
-    "rate hikes": 130,
-    "hawkish": 120,
-    "dovish": 120,
-    "jerome powell": 130,
+    "fed minutes": 140,
+    "fed meeting": 140,
+
+    "interest rate": 120,
+    "interest rates": 120,
+
+    "rate cut": 140,
+    "rate cuts": 140,
+
+    "rate hike": 140,
+    "rate hikes": 140,
+
+    "hawkish": 130,
+    "dovish": 130,
+
+    "jerome powell": 140,
     "powell": 100,
 
     # --------------------------------------------------------
-    # US ECONOMIC DATA
+    # US DATA
     # --------------------------------------------------------
 
-    "nfp": 150,
-    "nonfarm payroll": 150,
-    "non-farm payroll": 150,
-    "jobs report": 130,
-    "employment report": 130,
-    "employment": 80,
-    "unemployment": 110,
-    "unemployment rate": 120,
-    "jobless claims": 120,
-    "initial jobless claims": 120,
+    "nfp": 160,
+    "nonfarm payroll": 160,
+    "non-farm payroll": 160,
 
-    "cpi": 140,
-    "consumer price index": 140,
+    "jobs report": 140,
+    "employment report": 140,
+
+    "unemployment": 120,
+    "unemployment rate": 130,
+
+    "jobless claims": 130,
+    "initial jobless claims": 130,
+
+    "cpi": 150,
+    "consumer price index": 150,
+
     "inflation": 120,
     "inflation data": 130,
 
-    "pce": 140,
-    "core pce": 150,
-    "personal consumption expenditures": 140,
+    "pce": 150,
+    "core pce": 160,
+    "personal consumption expenditures": 150,
 
-    "ppi": 120,
-    "producer price index": 120,
+    "ppi": 130,
+    "producer price index": 130,
 
     "retail sales": 100,
-    "gdp": 90,
-    "economic growth": 80,
+    "gdp": 100,
 
     # --------------------------------------------------------
-    # USD / DXY
+    # USD
     # --------------------------------------------------------
+
+    "dxy": 140,
+    "dollar index": 140,
 
     "us dollar": 110,
     "u.s. dollar": 110,
-    "dollar": 60,
-    "usd": 70,
-    "dxy": 130,
-    "dollar index": 130,
 
     "dollar rises": 100,
     "dollar gains": 100,
-    "dollar falls": 100,
-    "dollar weakens": 100,
     "dollar strengthens": 100,
+
+    "dollar falls": 100,
+    "dollar declines": 100,
+    "dollar weakens": 100,
 
     # --------------------------------------------------------
     # TREASURY / YIELD
     # --------------------------------------------------------
 
-    "treasury yield": 130,
-    "treasury yields": 130,
-    "treasury": 80,
+    "treasury yield": 140,
+    "treasury yields": 140,
 
-    "10-year yield": 140,
-    "10 year yield": 140,
-    "10-year treasury": 130,
-    "10 year treasury": 130,
+    "10-year yield": 150,
+    "10 year yield": 150,
 
-    "bond yields": 110,
-    "bond yield": 110,
-    "yields rise": 110,
-    "yields fall": 110,
-    "rising yields": 120,
-    "falling yields": 120,
-    "higher yields": 120,
-    "lower yields": 120,
+    "10-year treasury": 140,
+    "10 year treasury": 140,
+
+    "bond yield": 120,
+    "bond yields": 120,
+
+    "rising yields": 130,
+    "falling yields": 130,
+
+    "higher yields": 130,
+    "lower yields": 130,
+
+    "yield rises": 120,
+    "yield falls": 120,
 
     # --------------------------------------------------------
     # WTI / OIL
     # --------------------------------------------------------
 
-    "wti": 150,
-    "wti crude": 150,
-    "west texas intermediate": 150,
+    "wti": 160,
+    "wti crude": 160,
+    "west texas intermediate": 160,
 
-    "crude oil": 120,
-    "crude prices": 110,
-    "crude price": 110,
+    "crude oil": 130,
+    "crude price": 120,
+    "crude prices": 120,
 
-    "oil price": 110,
-    "oil prices": 110,
+    "oil price": 120,
+    "oil prices": 120,
 
-    "oil rises": 110,
-    "oil gains": 110,
-    "oil climbs": 110,
-    "oil falls": 110,
-    "oil drops": 110,
-    "oil declines": 110,
+    "oil rises": 120,
+    "oil gains": 120,
+    "oil climbs": 120,
 
-    "oil supply": 120,
-    "oil demand": 100,
-    "oil inventory": 130,
-    "oil inventories": 130,
+    "oil falls": 120,
+    "oil drops": 120,
+    "oil declines": 120,
 
-    "eia": 120,
-    "opec": 130,
-    "opec+": 140,
-    "production cut": 130,
-    "production cuts": 130,
-    "production increase": 100,
+    "oil supply": 130,
+    "oil demand": 110,
+
+    "oil inventory": 140,
+    "oil inventories": 140,
+
+    "eia": 130,
+
+    "opec": 140,
+    "opec+": 150,
+
+    "production cut": 140,
+    "production cuts": 140,
+
+    "supply disruption": 140,
+    "supply disruptions": 140,
 
     # --------------------------------------------------------
     # GEOPOLITICAL
     # --------------------------------------------------------
 
-    "iran": 130,
-    "israel": 110,
-    "gaza": 110,
-    "hamas": 100,
+    "iran": 140,
+    "israel": 120,
+    "gaza": 120,
+    "hamas": 110,
 
-    "ukraine": 100,
-    "russia": 90,
+    "ukraine": 110,
+    "russia": 100,
 
     "war": 110,
-    "war risk": 120,
+    "war risk": 130,
 
-    "missile": 120,
-    "missiles": 120,
+    "missile": 130,
+    "missiles": 130,
 
-    "attack": 110,
-    "attacks": 110,
+    "attack": 120,
+    "attacks": 120,
 
-    "strike": 110,
-    "strikes": 110,
+    "strike": 120,
+    "strikes": 120,
 
     "military": 100,
-    "military action": 120,
+    "military action": 130,
 
-    "ceasefire": 110,
-    "peace talks": 90,
-    "peace deal": 100,
+    "ceasefire": 120,
+    "peace talks": 100,
+    "peace deal": 110,
 
-    "sanctions": 110,
+    "sanctions": 120,
 
-    "geopolitical": 100,
-    "geopolitical tensions": 120,
+    "geopolitical": 110,
+    "geopolitical tensions": 130,
 
-    "middle east": 110,
-    "west asia": 110,
+    "middle east": 120,
+    "west asia": 120,
 
-    "hormuz": 150,
-    "strait of hormuz": 160,
+    "hormuz": 160,
+    "strait of hormuz": 180,
 
     # --------------------------------------------------------
-    # RISK SENTIMENT
+    # MARKET RISK
     # --------------------------------------------------------
 
-    "safe haven": 120,
-    "safe-haven": 120,
+    "safe haven": 130,
+    "safe-haven": 130,
 
-    "risk off": 120,
-    "risk-off": 120,
+    "risk off": 130,
+    "risk-off": 130,
 
-    "market turmoil": 110,
-    "market volatility": 90,
+    "market turmoil": 120,
+    "market volatility": 100,
 
     "global markets": 60,
 }
 
 
 # ============================================================
-# EXCLUDE IRRELEVANT CONTENT
+# IRRELEVANT NEWS
 # ============================================================
 
 EXCLUDE = [
@@ -249,6 +325,7 @@ EXCLUDE = [
     "tennis",
     "judo",
     "taekwondo",
+    "badminton",
 
     "movie",
     "film",
@@ -261,15 +338,17 @@ EXCLUDE = [
 
     "fashion",
     "handbag",
-    "luxury",
+    "luxury handbag",
 
     "restaurant",
     "food",
     "cooking",
+    "recipe",
 
     "real estate",
     "housing",
     "property market",
+    "apartment",
 
     "wedding",
     "tourism",
@@ -277,11 +356,16 @@ EXCLUDE = [
 
     "video game",
     "gaming",
+    "game review",
+
+    "smartphone",
+    "iphone",
+    "android",
 ]
 
 
 # ============================================================
-# SCORE ARTICLE
+# SCORE
 # ============================================================
 
 def calculate_score(text):
@@ -298,7 +382,7 @@ def calculate_score(text):
     for word in EXCLUDE:
 
         if word in text:
-            score -= 200
+            score -= 250
 
     return score
 
@@ -318,7 +402,6 @@ def get_category(title):
         "non-farm payroll",
         "jobs report",
         "employment report",
-        "employment",
         "unemployment",
         "jobless claims",
     ]):
@@ -349,7 +432,6 @@ def get_category(title):
         "rate hikes",
         "hawkish",
         "dovish",
-        "jerome powell",
         "powell",
     ]):
         return "🏦 Fed / Suku Bunga"
@@ -375,7 +457,7 @@ def get_category(title):
     ]):
         return "🛢️ WTI / Oil"
 
-    # Geopolitical
+    # Geopolitics
     if any(x in text for x in [
         "iran",
         "israel",
@@ -534,12 +616,14 @@ def analyze_gold(title):
     ]
 
     bull = sum(
-        1 for x in bullish
+        1
+        for x in bullish
         if x in text
     )
 
     bear = sum(
-        1 for x in bearish
+        1
+        for x in bearish
         if x in text
     )
 
@@ -607,12 +691,14 @@ def analyze_usd(title):
     ]
 
     bear = sum(
-        1 for x in bearish
+        1
+        for x in bearish
         if x in text
     )
 
     bull = sum(
-        1 for x in bullish
+        1
+        for x in bullish
         if x in text
     )
 
@@ -683,7 +769,7 @@ def analyze_yield(title):
 
 
 # ============================================================
-# WTI / OIL ANALYSIS
+# OIL / WTI ANALYSIS
 # ============================================================
 
 def analyze_oil(title):
@@ -749,12 +835,14 @@ def analyze_oil(title):
     ]
 
     bull = sum(
-        1 for x in bullish
+        1
+        for x in bullish
         if x in text
     )
 
     bear = sum(
-        1 for x in bearish
+        1
+        for x in bearish
         if x in text
     )
 
@@ -782,7 +870,7 @@ def analyze_oil(title):
 
 
 # ============================================================
-# NORMALIZE TITLE
+# NORMALIZE
 # ============================================================
 
 def normalize_title(title):
@@ -795,7 +883,7 @@ def normalize_title(title):
 
 
 # ============================================================
-# FETCH RSS
+# FETCH RSS FEED
 # ============================================================
 
 async def fetch_feed(
@@ -813,25 +901,36 @@ async def fetch_feed(
             ),
             headers={
                 "User-Agent":
-                "Mozilla/5.0 "
-                "(XAUUSD Assistant)"
+                    "Mozilla/5.0 "
+                    "(Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 "
+                    "Chrome/151.0 Safari/537.36"
             },
         ) as response:
 
             if response.status != 200:
 
                 print(
-                    f"[RSS] {source}: "
+                    f"[RSS] {source} "
                     f"HTTP {response.status}"
                 )
 
                 return []
 
-            content = await response.text()
+            content = await response.read()
 
             feed = feedparser.parse(
                 content
             )
+
+            if not feed.entries:
+
+                print(
+                    f"[RSS] {source}: "
+                    f"0 entries"
+                )
+
+                return []
 
             results = []
 
@@ -866,10 +965,6 @@ async def fetch_feed(
                 if not title or not url:
                     continue
 
-                # --------------------------------------------
-                # ANALYZE TITLE + DESCRIPTION
-                # --------------------------------------------
-
                 searchable_text = (
                     f"{title} "
                     f"{description}"
@@ -879,21 +974,28 @@ async def fetch_feed(
                     searchable_text
                 )
 
-                # Minimum relevance
-                if score < 70:
+                if score < 60:
                     continue
 
                 results.append({
+
                     "title": title,
+
                     "url": url,
+
                     "source": source,
+
                     "published": published,
-                    "description": description,
+
+                    "description":
+                        description,
+
                     "score": score,
                 })
 
             print(
                 f"[RSS] {source}: "
+                f"{len(feed.entries)} entries / "
                 f"{len(results)} relevant"
             )
 
@@ -917,7 +1019,7 @@ async def get_news():
     articles = []
 
     timeout = aiohttp.ClientTimeout(
-        total=30
+        total=40
     )
 
     async with aiohttp.ClientSession(
@@ -926,21 +1028,37 @@ async def get_news():
 
         tasks = []
 
-        for source, feeds in RSS_FEEDS.items():
+        # ----------------------------------------------------
+        # DIRECT RSS
+        # ----------------------------------------------------
 
-            for feed_url in feeds:
+        for source, url in RSS_FEEDS.items():
 
-                tasks.append(
-                    fetch_feed(
-                        session,
-                        source,
-                        feed_url,
-                    )
+            tasks.append(
+                fetch_feed(
+                    session,
+                    source,
+                    url
                 )
+            )
+
+        # ----------------------------------------------------
+        # GOOGLE NEWS RSS
+        # ----------------------------------------------------
+
+        for query in GOOGLE_NEWS_QUERIES:
+
+            tasks.append(
+                fetch_feed(
+                    session,
+                    f"Google News: {query}",
+                    google_news_url(query)
+                )
+            )
 
         results = await asyncio.gather(
             *tasks,
-            return_exceptions=True,
+            return_exceptions=True
         )
 
         for result in results:
@@ -973,27 +1091,33 @@ async def get_news():
 
             unique[key] = article
 
-        elif (
-            article["score"]
-            > unique[key]["score"]
-        ):
+        else:
 
-            unique[key] = article
+            if (
+                article["score"]
+                > unique[key]["score"]
+            ):
+
+                unique[key] = article
 
     articles = list(
         unique.values()
     )
 
     # ========================================================
-    # SORT BY IMPACT
+    # SORT
     # ========================================================
 
     articles.sort(
         key=lambda x: x["score"],
-        reverse=True,
+        reverse=True
     )
 
-    # Maximum 20
+    print(
+        f"[NEWS] Total relevant articles: "
+        f"{len(articles)}"
+    )
+
     return articles[:20]
 
 
@@ -1030,13 +1154,16 @@ def format_breaking_news(article):
     )
 
     return (
-        "🚨 BREAKING NEWS\n\n"
+        "🚨 BREAKING NEWS\n"
 
-        f"📂 {category}\n\n"
+        "📂 "
+        f"{category}\n"
 
-        f"📰 {title}\n\n"
+        "📰 "
+        f"{title}\n"
 
-        f"⚠️ {impact}\n"
+        "⚠️ "
+        f"{impact}\n"
 
         f"{gold}\n"
 
@@ -1046,5 +1173,34 @@ def format_breaking_news(article):
 
         f"{oil}\n"
 
-        f"🔗 {article['url']}"
+        "🔗 "
+        f"{article['url']}"
+    )
+
+
+# ============================================================
+# SIMPLE NEWS FORMAT
+# ============================================================
+
+def format_news(article):
+
+    title = article["title"]
+
+    category = get_category(
+        title
+    )
+
+    impact = get_impact(
+        article["score"]
+    )
+
+    return (
+        "🥇 XAUUSD NEWS\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"📂 {category}\n"
+        f"📰 {title}\n"
+        f"🏢 {article['source']}\n"
+        f"⚠️ {impact}\n"
+        f"🔗 {article['url']}\n"
+        "━━━━━━━━━━━━━━━━━━"
     )
