@@ -16,16 +16,12 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/151.0.0.0 Safari/537.36"
     ),
-    "Accept": (
-        "text/html,application/xhtml+xml,"
-        "application/xml;q=0.9,*/*;q=0.8"
-    ),
     "Accept-Language": "en-US,en;q=0.9",
 }
 
 
 # ============================================================
-# KEYWORDS
+# GOLD
 # ============================================================
 
 GOLD_KEYWORDS = [
@@ -37,6 +33,10 @@ GOLD_KEYWORDS = [
     "precious metals",
 ]
 
+
+# ============================================================
+# USD
+# ============================================================
 
 USD_KEYWORDS = [
     "usd",
@@ -54,6 +54,10 @@ USD_KEYWORDS = [
 ]
 
 
+# ============================================================
+# YIELD
+# ============================================================
+
 YIELD_KEYWORDS = [
     "yield",
     "yields",
@@ -66,7 +70,10 @@ YIELD_KEYWORDS = [
 ]
 
 
-# OIL + WTI = SATU KATEGORI
+# ============================================================
+# OIL + WTI = SATU
+# ============================================================
+
 OIL_KEYWORDS = [
     "oil",
     "wti",
@@ -83,6 +90,10 @@ OIL_KEYWORDS = [
     "eia",
 ]
 
+
+# ============================================================
+# HIGH IMPACT
+# ============================================================
 
 HIGH_IMPACT_KEYWORDS = [
     "nfp",
@@ -118,25 +129,28 @@ HIGH_IMPACT_KEYWORDS = [
     "ukraine",
     "middle east",
     "hormuz",
+    "retail sales",
+    "pce",
+    "jobless claims",
+    "jolts",
+    "ism",
+    "pmi",
 ]
 
 
 # ============================================================
-# BERITA YANG TIDAK BOLEH DIKIRIM
+# BERITA YANG TIDAK DIKIRIM
 # ============================================================
 
 BLOCKED_KEYWORDS = [
     "newsquawk week ahead",
     "week ahead",
-    "next week",
     "weekly preview",
     "weekly outlook",
     "week ahead preview",
     "events next week",
     "calendar next week",
-    "agenda minggu depan",
     "coming week",
-    "this week ahead",
 ]
 
 
@@ -226,6 +240,71 @@ CATEGORY_KEYWORDS = {
 
 
 # ============================================================
+# TEXT
+# ============================================================
+
+def clean_text(text):
+
+    if not text:
+        return ""
+
+    soup = BeautifulSoup(
+        text,
+        "html.parser"
+    )
+
+    return " ".join(
+        soup.get_text(
+            " ",
+            strip=True
+        ).split()
+    )
+
+
+def contains_keyword(
+    text,
+    keywords
+):
+
+    if not text:
+        return False
+
+    text_lower = text.lower()
+
+    return any(
+        keyword.lower() in text_lower
+        for keyword in keywords
+    )
+
+
+def normalize_url(url):
+
+    if not url:
+        return ""
+
+    url = url.strip()
+
+    if url.startswith("/"):
+        return urljoin(
+            BASE_URL,
+            url
+        )
+
+    return url
+
+
+def is_blocked_news(text):
+
+    if not text:
+        return True
+
+    return contains_keyword(
+        text,
+        BLOCKED_KEYWORDS
+    )
+
+
+# ============================================================
 # TRANSLATION
 # ============================================================
 
@@ -241,22 +320,16 @@ def translate_to_indonesian(text):
 
     try:
 
-        url = (
-            "https://translate.googleapis.com/"
-            "translate_a/single"
-        )
-
-        params = {
-            "client": "gtx",
-            "sl": "en",
-            "tl": "id",
-            "dt": "t",
-            "q": text,
-        }
-
         response = requests.get(
-            url,
-            params=params,
+            "https://translate.googleapis.com/"
+            "translate_a/single",
+            params={
+                "client": "gtx",
+                "sl": "en",
+                "tl": "id",
+                "dt": "t",
+                "q": text,
+            },
             headers=HEADERS,
             timeout=20,
         )
@@ -283,10 +356,7 @@ def translate_to_indonesian(text):
 
         translated = translated.strip()
 
-        if translated:
-            return translated
-
-        return text
+        return translated or text
 
     except Exception as e:
 
@@ -299,129 +369,6 @@ def translate_to_indonesian(text):
         return text
 
 
-def translate_long_text(text):
-
-    if not text:
-        return ""
-
-    text = text.strip()
-
-    if len(text) <= 4500:
-
-        return translate_to_indonesian(
-            text
-        )
-
-    sentences = re.split(
-        r"(?<=[.!?])\s+",
-        text
-    )
-
-    chunks = []
-    current = ""
-
-    for sentence in sentences:
-
-        if len(current) + len(sentence) > 4000:
-
-            if current:
-                chunks.append(
-                    current
-                )
-
-            current = sentence
-
-        else:
-
-            if current:
-                current += " "
-
-            current += sentence
-
-    if current:
-        chunks.append(
-            current
-        )
-
-    translated_chunks = []
-
-    for chunk in chunks:
-
-        translated_chunks.append(
-            translate_to_indonesian(
-                chunk
-            )
-        )
-
-        time.sleep(0.3)
-
-    return " ".join(
-        translated_chunks
-    )
-
-
-# ============================================================
-# TEXT HELPERS
-# ============================================================
-
-def clean_text(text):
-
-    if not text:
-        return ""
-
-    soup = BeautifulSoup(
-        text,
-        "html.parser"
-    )
-
-    return " ".join(
-        soup.get_text(
-            " ",
-            strip=True
-        ).split()
-    )
-
-
-def contains_keyword(text, keywords):
-
-    if not text:
-        return False
-
-    text_lower = text.lower()
-
-    return any(
-        keyword.lower() in text_lower
-        for keyword in keywords
-    )
-
-
-def is_blocked_news(text):
-
-    if not text:
-        return True
-
-    return contains_keyword(
-        text,
-        BLOCKED_KEYWORDS
-    )
-
-
-def normalize_url(url):
-
-    if not url:
-        return ""
-
-    url = url.strip()
-
-    if url.startswith("/"):
-        return urljoin(
-            BASE_URL,
-            url
-        )
-
-    return url
-
-
 # ============================================================
 # CATEGORY
 # ============================================================
@@ -430,8 +377,7 @@ def detect_category(text):
 
     text_lower = text.lower()
 
-    # Urutan penting agar kategori lebih tepat
-    priority = [
+    order = [
         "💼 Tenaga Kerja",
         "🏦 Bank Sentral",
         "📊 Inflasi",
@@ -440,15 +386,14 @@ def detect_category(text):
         "💵 Ekonomi AS",
     ]
 
-    for category in priority:
+    for category in order:
 
-        keywords = CATEGORY_KEYWORDS[
+        for keyword in CATEGORY_KEYWORDS[
             category
-        ]
-
-        for keyword in keywords:
+        ]:
 
             if keyword.lower() in text_lower:
+
                 return category
 
     return "📰 Market"
@@ -460,19 +405,11 @@ def detect_category(text):
 
 def calculate_impact(text):
 
-    if not text:
-        return (
-            "Low Impact",
-            "⭐⭐"
-        )
-
-    text_lower = text.lower()
-
     score = 0
 
     for keyword in HIGH_IMPACT_KEYWORDS:
 
-        if keyword.lower() in text_lower:
+        if keyword.lower() in text.lower():
             score += 2
 
     if contains_keyword(
@@ -527,7 +464,7 @@ def calculate_impact(text):
 
 
 # ============================================================
-# GET ARTICLE
+# ARTICLE
 # ============================================================
 
 def get_article(url):
@@ -541,12 +478,6 @@ def get_article(url):
         )
 
         if response.status_code != 200:
-
-            print(
-                "[ARTICLE] HTTP:",
-                response.status_code
-            )
-
             return ""
 
         soup = BeautifulSoup(
@@ -630,7 +561,7 @@ def get_article(url):
 
 
 # ============================================================
-# MARKET ANALYSIS
+# GOLD ANALYSIS
 # ============================================================
 
 def analyze_gold(text):
@@ -688,6 +619,10 @@ def analyze_gold(text):
     )
 
 
+# ============================================================
+# USD ANALYSIS
+# ============================================================
+
 def analyze_usd(text):
 
     lower = text.lower()
@@ -741,6 +676,10 @@ def analyze_usd(text):
     )
 
 
+# ============================================================
+# YIELD ANALYSIS
+# ============================================================
+
 def analyze_yield(text):
 
     lower = text.lower()
@@ -785,6 +724,10 @@ def analyze_yield(text):
         "Pantau pergerakan US Treasury Yield."
     )
 
+
+# ============================================================
+# OIL / WTI ANALYSIS
+# ============================================================
 
 def analyze_oil(text):
 
@@ -902,6 +845,12 @@ def get_news(limit=10):
         href=True
     )
 
+    # ========================================================
+    # PERTAMA: AMBIL SEMUA LINK BERITA
+    # ========================================================
+
+    candidates = []
+
     for link in links:
 
         href = normalize_url(
@@ -929,24 +878,34 @@ def get_news(limit=10):
 
         seen.add(href)
 
-        # ----------------------------------------------------
-        # BLOKIR BERITA AGENDA / WEEK AHEAD
-        # ----------------------------------------------------
-
-        if is_blocked_news(title):
-
-            print(
-                "[FILTER] Blocked:",
-                title
-            )
-
+        if is_blocked_news(
+            title
+        ):
             continue
 
+        candidates.append(
+            (
+                title,
+                href
+            )
+        )
+
+    print(
+        "[NEWS] Candidate articles:",
+        len(candidates)
+    )
+
+    # ========================================================
+    # PROSES CANDIDATES
+    # ========================================================
+
+    for title, href in candidates:
+
         # ----------------------------------------------------
-        # CEK RELEVANSI
+        # HEADLINE RELEVANCE
         # ----------------------------------------------------
 
-        relevant = (
+        headline_relevant = (
             contains_keyword(
                 title,
                 GOLD_KEYWORDS
@@ -969,6 +928,75 @@ def get_news(limit=10):
             )
         )
 
+        # ----------------------------------------------------
+        # Kalau headline belum jelas,
+        # baca artikelnya
+        # ----------------------------------------------------
+
+        article = ""
+
+        if headline_relevant:
+
+            article = get_article(
+                href
+            )
+
+        else:
+
+            # Tetap baca artikel karena
+            # headline InvestingLive terkadang
+            # tidak menyebut Gold/USD secara langsung.
+
+            article = get_article(
+                href
+            )
+
+        full_text = (
+            title + " " + article
+        )
+
+        # ----------------------------------------------------
+        # FILTER AGENDA / WEEK AHEAD
+        # ----------------------------------------------------
+
+        if is_blocked_news(
+            full_text
+        ):
+
+            print(
+                "[FILTER] Blocked:",
+                title
+            )
+
+            continue
+
+        # ----------------------------------------------------
+        # RELEVANSI FINAL
+        # ----------------------------------------------------
+
+        relevant = (
+            contains_keyword(
+                full_text,
+                GOLD_KEYWORDS
+            )
+            or contains_keyword(
+                full_text,
+                USD_KEYWORDS
+            )
+            or contains_keyword(
+                full_text,
+                YIELD_KEYWORDS
+            )
+            or contains_keyword(
+                full_text,
+                OIL_KEYWORDS
+            )
+            or contains_keyword(
+                full_text,
+                HIGH_IMPACT_KEYWORDS
+            )
+        )
+
         if not relevant:
 
             continue
@@ -977,33 +1005,6 @@ def get_news(limit=10):
             "[NEWS] Relevant:",
             title
         )
-
-        # ----------------------------------------------------
-        # AMBIL ARTIKEL
-        # ----------------------------------------------------
-
-        article = get_article(
-            href
-        )
-
-        full_text = (
-            title + " " + article
-        )
-
-        # ----------------------------------------------------
-        # FILTER LAGI SETELAH MEMBACA ARTIKEL
-        # ----------------------------------------------------
-
-        if is_blocked_news(
-            full_text
-        ):
-
-            print(
-                "[FILTER] Blocked article:",
-                title
-            )
-
-            continue
 
         # ----------------------------------------------------
         # IMPACT
@@ -1018,7 +1019,7 @@ def get_news(limit=10):
         )
 
         # ----------------------------------------------------
-        # ID UNIK
+        # UNIQUE ID
         # ----------------------------------------------------
 
         news_id = hashlib.sha256(
@@ -1026,7 +1027,7 @@ def get_news(limit=10):
         ).hexdigest()
 
         # ----------------------------------------------------
-        # TRANSLATE HEADLINE
+        # TRANSLATE
         # ----------------------------------------------------
 
         print(
@@ -1046,7 +1047,7 @@ def get_news(limit=10):
         )
 
         # ----------------------------------------------------
-        # HASIL
+        # RESULT
         # ----------------------------------------------------
 
         result = {
@@ -1087,8 +1088,11 @@ def get_news(limit=10):
         )
 
         if len(results) >= limit:
-
             break
+
+        # Jangan terlalu cepat
+        # request ke server.
+        time.sleep(0.2)
 
     print(
         "[NEWS] Relevant articles:",
