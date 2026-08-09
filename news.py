@@ -1,4 +1,3 @@
- ```python
 import requests
 import feedparser
 
@@ -27,20 +26,28 @@ def test_feed(url):
         )
 
         print(f"[HTTP] Status: {response.status_code}")
-        print(f"[HTTP] Content-Type: {response.headers.get('content-type')}")
-        print(f"[HTTP] Size: {len(response.content)} bytes")
+        print(
+            f"[HTTP] Content-Type: "
+            f"{response.headers.get('content-type')}"
+        )
+        print(
+            f"[HTTP] Size: "
+            f"{len(response.content)} bytes"
+        )
 
         feed = feedparser.parse(
             response.content
         )
 
         print(
-            f"[RSS] Entries: {len(feed.entries)}"
+            f"[RSS] Entries: "
+            f"{len(feed.entries)}"
         )
 
         if feed.bozo:
             print(
-                f"[RSS] Parse warning: {feed.bozo_exception}"
+                f"[RSS] Parse warning: "
+                f"{feed.bozo_exception}"
             )
 
         for entry in feed.entries[:5]:
@@ -66,7 +73,8 @@ def test_feed(url):
     except Exception as e:
 
         print(
-            f"[ERROR] {type(e).__name__}: {e}"
+            f"[ERROR] "
+            f"{type(e).__name__}: {e}"
         )
 
         return None
@@ -109,15 +117,28 @@ def get_news(limit=20):
                     "category": "📰 Market",
                     "impact": "Market Impact",
                     "stars": "⭐⭐⭐",
-                    "gold": "Potensi volatilitas tinggi. Tunggu reaksi harga.",
-                    "usd": "Perhatikan arah dolar setelah rilis data/kebijakan.",
-                    "yield": "Pantau pergerakan US Treasury Yield.",
-                    "oil": "Perubahan minyak dapat mempengaruhi ekspektasi inflasi.",
+                    "gold": (
+                        "Potensi volatilitas tinggi. "
+                        "Tunggu reaksi harga."
+                    ),
+                    "usd": (
+                        "Perhatikan arah dolar "
+                        "setelah rilis data/kebijakan."
+                    ),
+                    "yield": (
+                        "Pantau pergerakan "
+                        "US Treasury Yield."
+                    ),
+                    "oil": (
+                        "Perubahan minyak dapat "
+                        "mempengaruhi ekspektasi inflasi."
+                    ),
                 }
             )
 
     print(
-        f"[RESULT] Total news: {len(all_news)}"
+        f"[RESULT] Total news: "
+        f"{len(all_news)}"
     )
 
     return all_news
