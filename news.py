@@ -147,4 +147,3 @@ def format_news(news):
         f"🔗 <a href=\"{news['link']}\">"
         "Sumber berita</a>"
     )
-```
