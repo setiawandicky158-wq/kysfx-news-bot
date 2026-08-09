@@ -2,9 +2,10 @@ import os
 import time
 import logging
 import requests
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from news import get_news, format_news
-
 from ff_calendar import (
     get_calendar_events,
     format_calendar_event,
@@ -21,10 +22,11 @@ CHECK_INTERVAL = int(
     os.getenv("CHECK_INTERVAL", "60")
 )
 
-# Event hanya dikirim jika waktunya <= 2 jam
 EVENT_ALERT_HOURS = float(
     os.getenv("EVENT_ALERT_HOURS", "2")
 )
+
+WITA = ZoneInfo("Asia/Makassar")
 
 # ============================================================
 # LOGGING
@@ -38,7 +40,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# VALIDATE CONFIG
+# VALIDATE
 # ============================================================
 
 if not BOT_TOKEN:
@@ -56,7 +58,6 @@ if not CHAT_ID:
 # ============================================================
 
 def send_telegram(message):
-
     url = (
         f"https://api.telegram.org/"
         f"bot{BOT_TOKEN}/sendMessage"
@@ -70,7 +71,6 @@ def send_telegram(message):
     }
 
     try:
-
         response = requests.post(
             url,
             json=payload,
@@ -82,32 +82,26 @@ def send_telegram(message):
         data = response.json()
 
         if not data.get("ok"):
-
             logger.error(
-                "Telegram error: %s",
+                "[TELEGRAM] API error: %s",
                 data
             )
-
             return False
 
         return True
 
     except requests.exceptions.RequestException as e:
-
         logger.error(
-            "Telegram request error: %s",
+            "[TELEGRAM] Request error: %s",
             e
         )
-
         return False
 
     except Exception as e:
-
-        logger.error(
-            "Telegram unexpected error: %s",
+        logger.exception(
+            "[TELEGRAM] Unexpected error: %s",
             e
         )
-
         return False
 
 
@@ -116,21 +110,19 @@ def send_telegram(message):
 # ============================================================
 
 def get_news_id(news):
-
-    link = news.get(
-        "link",
-        ""
-    ).strip()
+    link = (
+        news.get("link", "")
+        .strip()
+    )
 
     if link:
         return link
 
-    title = news.get(
-        "title",
-        ""
-    ).strip().lower()
-
-    return title
+    return (
+        news.get("title", "")
+        .strip()
+        .lower()
+    )
 
 
 # ============================================================
@@ -138,13 +130,34 @@ def get_news_id(news):
 # ============================================================
 
 def get_event_id(event):
+    event_name = (
+        event.get("event", "")
+        .strip()
+        .lower()
+    )
 
-    return "|".join(
-        [
-            event.get("event", ""),
-            event.get("currency", ""),
-            str(event.get("datetime", "")),
-        ]
+    currency = (
+        event.get("currency", "")
+        .strip()
+        .upper()
+    )
+
+    event_datetime = event.get(
+        "datetime"
+    )
+
+    if event_datetime:
+        event_time = event_datetime.isoformat()
+    else:
+        event_time = (
+            f"{event.get('date', '')}|"
+            f"{event.get('time', '')}"
+        )
+
+    return (
+        f"{event_name}|"
+        f"{currency}|"
+        f"{event_time}"
     )
 
 
@@ -153,13 +166,11 @@ def get_event_id(event):
 # ============================================================
 
 def check_news(sent_news):
-
     logger.info(
         "[NEWS] Checking breaking news..."
     )
 
     try:
-
         news_list = get_news(
             limit=15
         )
@@ -182,25 +193,18 @@ def check_news(sent_news):
                 continue
 
             try:
-
                 message = format_news(
                     news
                 )
 
             except Exception as e:
-
                 logger.error(
                     "[NEWS] Format error: %s",
                     e
                 )
-
                 continue
 
-            success = send_telegram(
-                message
-            )
-
-            if success:
+            if send_telegram(message):
 
                 sent_news.add(
                     news_id
@@ -208,24 +212,10 @@ def check_news(sent_news):
 
                 logger.info(
                     "[NEWS] News sent: %s",
-                    news.get(
-                        "title",
-                        ""
-                    )
-                )
-
-            else:
-
-                logger.error(
-                    "[NEWS] Failed to send: %s",
-                    news.get(
-                        "title",
-                        ""
-                    )
+                    news.get("title", "")
                 )
 
     except Exception as e:
-
         logger.exception(
             "[NEWS] Check error: %s",
             e
@@ -233,11 +223,13 @@ def check_news(sent_news):
 
 
 # ============================================================
-# GOLD CALENDAR CHECK
+# CALENDAR CHECK
 # ============================================================
 
-def check_calendar(sent_events):
-
+def check_calendar(
+    alerted_events,
+    result_events
+):
     logger.info(
         "[CALENDAR] Checking Gold events..."
     )
@@ -245,69 +237,106 @@ def check_calendar(sent_events):
     try:
 
         events = get_calendar_events(
-            hours_ahead=EVENT_ALERT_HOURS
+            hours_ahead=48
         )
 
         logger.info(
-            "[CALENDAR] Gold events found: %s",
+            "[CALENDAR] Total upcoming Gold events: %s",
             len(events)
         )
 
+        now = datetime.now(WITA)
+
         for event in events:
+
+            event_datetime = event.get(
+                "datetime"
+            )
+
+            if not event_datetime:
+                continue
 
             event_id = get_event_id(
                 event
             )
 
-            if not event_id:
-                continue
+            seconds_until = (
+                event_datetime - now
+            ).total_seconds()
 
-            if event_id in sent_events:
-                continue
+            hours_until = (
+                seconds_until / 3600
+            )
 
-            try:
+            # =================================================
+            # H-2 HOURS ALERT
+            # =================================================
+
+            if (
+                0
+                <= hours_until
+                <= EVENT_ALERT_HOURS
+            ):
+
+                if event_id in alerted_events:
+                    continue
+
+                # Update countdown tepat saat dikirim
+                event["countdown"] = (
+                    f"{max(0, int(seconds_until)) // 3600:02d}:"
+                    f"{(max(0, int(seconds_until)) % 3600) // 60:02d}:"
+                    f"{max(0, int(seconds_until)) % 60:02d}"
+                )
 
                 message = format_calendar_event(
                     event,
                     result=False
                 )
 
-            except Exception as e:
+                if send_telegram(message):
 
-                logger.error(
-                    "[CALENDAR] Format error: %s",
-                    e
-                )
-
-                continue
-
-            success = send_telegram(
-                message
-            )
-
-            if success:
-
-                sent_events.add(
-                    event_id
-                )
-
-                logger.info(
-                    "[CALENDAR] Event sent: %s",
-                    event.get(
-                        "event",
-                        ""
+                    alerted_events.add(
+                        event_id
                     )
-                )
 
-            else:
-
-                logger.error(
-                    "[CALENDAR] Failed to send event: %s",
-                    event.get(
-                        "event",
-                        ""
+                    logger.info(
+                        "[CALENDAR] H-2 alert sent: %s | %s",
+                        event.get("event"),
+                        event_datetime
                     )
+
+            # =================================================
+            # EVENT RESULT
+            # =================================================
+
+            actual = (
+                event.get("actual", "")
+                or ""
+            ).strip()
+
+            if actual:
+
+                result_id = (
+                    f"RESULT|{event_id}"
                 )
+
+                if result_id not in result_events:
+
+                    message = format_calendar_event(
+                        event,
+                        result=True
+                    )
+
+                    if send_telegram(message):
+
+                        result_events.add(
+                            result_id
+                        )
+
+                        logger.info(
+                            "[CALENDAR] Result sent: %s",
+                            event.get("event")
+                        )
 
     except Exception as e:
 
@@ -318,7 +347,54 @@ def check_calendar(sent_events):
 
 
 # ============================================================
-# MAIN LOOP
+# MEMORY CLEANUP
+# ============================================================
+
+def cleanup_memory(
+    sent_news,
+    alerted_events,
+    result_events
+):
+
+    if len(sent_news) > 1000:
+
+        old_items = list(
+            sent_news
+        )[-500:]
+
+        sent_news.clear()
+
+        sent_news.update(
+            old_items
+        )
+
+    if len(alerted_events) > 1000:
+
+        old_items = list(
+            alerted_events
+        )[-500:]
+
+        alerted_events.clear()
+
+        alerted_events.update(
+            old_items
+        )
+
+    if len(result_events) > 1000:
+
+        old_items = list(
+            result_events
+        )[-500:]
+
+        result_events.clear()
+
+        result_events.update(
+            old_items
+        )
+
+
+# ============================================================
+# MAIN
 # ============================================================
 
 def run():
@@ -342,59 +418,61 @@ def run():
     )
 
     logger.info(
+        "Timezone: WITA (Asia/Makassar)"
+    )
+
+    logger.info(
         "======================================"
     )
 
     sent_news = set()
-    sent_events = set()
+
+    alerted_events = set()
+
+    result_events = set()
 
     while True:
 
         try:
 
-            # ------------------------------------------------
+            # =================================================
             # NEWS
-            # ------------------------------------------------
+            # =================================================
 
             check_news(
                 sent_news
             )
 
-            # ------------------------------------------------
-            # GOLD ECONOMIC CALENDAR
-            # ------------------------------------------------
+            # =================================================
+            # GOLD CALENDAR
+            # =================================================
 
             check_calendar(
-                sent_events
+                alerted_events,
+                result_events
             )
 
-            # ------------------------------------------------
-            # MEMORY LIMIT
-            # ------------------------------------------------
+            # =================================================
+            # MEMORY
+            # =================================================
 
-            if len(sent_news) > 1000:
-
-                sent_news = set(
-                    list(sent_news)[-500:]
-                )
-
-            if len(sent_events) > 500:
-
-                sent_events = set(
-                    list(sent_events)[-250:]
-                )
-
-            logger.info(
-                "Next check in %s seconds...",
-                CHECK_INTERVAL
+            cleanup_memory(
+                sent_news,
+                alerted_events,
+                result_events
             )
 
         except Exception as e:
 
             logger.exception(
-                "Main loop error: %s",
+                "[MAIN] Main loop error: %s",
                 e
             )
+
+        logger.info(
+            "Next check in %s seconds...",
+            CHECK_INTERVAL
+        )
 
         time.sleep(
             CHECK_INTERVAL
