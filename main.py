@@ -2,9 +2,15 @@ import os
 import time
 import logging
 import requests
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from news import get_news, format_news
-
+from ff_calendar import (
+    get_calendar_events,
+    get_event_id,
+    format_calendar_event,
+)
 
 # ============================================================
 # CONFIG
@@ -17,6 +23,12 @@ CHECK_INTERVAL = int(
     os.getenv("CHECK_INTERVAL", "60")
 )
 
+# 2 JAM SEBELUM EVENT
+EVENT_ALERT_HOURS = float(
+    os.getenv("EVENT_ALERT_HOURS", "2")
+)
+
+WITA = ZoneInfo("Asia/Makassar")
 
 # ============================================================
 # LOGGING
@@ -28,7 +40,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
 
 # ============================================================
 # VALIDATE CONFIG
@@ -43,7 +54,6 @@ if not CHAT_ID:
     raise RuntimeError(
         "CHAT_ID belum diset di Railway Variables."
     )
-
 
 # ============================================================
 # TELEGRAM
@@ -128,6 +138,342 @@ def get_news_id(news):
 
 
 # ============================================================
+# EVENT IS IN ALERT WINDOW
+# ============================================================
+
+def is_event_in_alert_window(event):
+
+    event_datetime = event.get(
+        "datetime"
+    )
+
+    if not event_datetime:
+        return False
+
+    now = datetime.now(WITA)
+
+    # Past event
+    if event_datetime <= now:
+        return False
+
+    # Event harus berada dalam 2 jam ke depan
+    alert_limit = (
+        now
+        + timedelta(
+            hours=EVENT_ALERT_HOURS
+        )
+    )
+
+    if event_datetime <= alert_limit:
+        return True
+
+    return False
+
+
+# ============================================================
+# EVENT COUNTDOWN
+# ============================================================
+
+def calculate_event_countdown(event):
+
+    event_datetime = event.get(
+        "datetime"
+    )
+
+    if not event_datetime:
+        return "-"
+
+    now = datetime.now(WITA)
+
+    seconds = int(
+        (
+            event_datetime - now
+        ).total_seconds()
+    )
+
+    if seconds <= 0:
+        return "EVENT SUDAH BERLANGSUNG"
+
+    hours = seconds // 3600
+
+    minutes = (
+        seconds % 3600
+    ) // 60
+
+    secs = seconds % 60
+
+    return (
+        f"{hours:02d}:"
+        f"{minutes:02d}:"
+        f"{secs:02d}"
+    )
+
+
+# ============================================================
+# PREPARE CALENDAR EVENT
+# ============================================================
+
+def prepare_calendar_event(event):
+
+    event = dict(event)
+
+    event["countdown"] = (
+        calculate_event_countdown(
+            event
+        )
+    )
+
+    return event
+
+
+# ============================================================
+# CHECK GOLD EVENTS
+# ============================================================
+
+def check_gold_events(sent_events):
+
+    logger.info(
+        "[CALENDAR] Checking Gold economic events..."
+    )
+
+    try:
+
+        # Ambil event 48 jam ke depan
+        events = get_calendar_events(
+            hours_ahead=48
+        )
+
+    except Exception as e:
+
+        logger.exception(
+            "[CALENDAR] Failed to get events: %s",
+            e
+        )
+
+        return
+
+    logger.info(
+        "[CALENDAR] Gold events found: %s",
+        len(events)
+    )
+
+    for event in events:
+
+        try:
+
+            # ------------------------------------------------
+            # FILTER 2 JAM
+            # ------------------------------------------------
+
+            if not is_event_in_alert_window(
+                event
+            ):
+
+                continue
+
+            event = prepare_calendar_event(
+                event
+            )
+
+            event_id = get_event_id(
+                event
+            )
+
+            if not event_id:
+                continue
+
+            # ------------------------------------------------
+            # JANGAN KIRIM ULANG
+            # ------------------------------------------------
+
+            if event_id in sent_events:
+
+                logger.info(
+                    "[CALENDAR] Already sent: %s",
+                    event.get(
+                        "event",
+                        ""
+                    )
+                )
+
+                continue
+
+            # ------------------------------------------------
+            # LOG
+            # ------------------------------------------------
+
+            logger.info(
+                "[CALENDAR] Alert window: %s | %s",
+                event.get(
+                    "event",
+                    ""
+                ),
+                event.get(
+                    "countdown",
+                    ""
+                )
+            )
+
+            # ------------------------------------------------
+            # FORMAT
+            # ------------------------------------------------
+
+            message = format_calendar_event(
+                event,
+                result=False
+            )
+
+            # ------------------------------------------------
+            # SEND TELEGRAM
+            # ------------------------------------------------
+
+            success = send_telegram(
+                message
+            )
+
+            if success:
+
+                sent_events.add(
+                    event_id
+                )
+
+                logger.info(
+                    "[CALENDAR] Event sent: %s",
+                    event.get(
+                        "event",
+                        ""
+                    )
+                )
+
+            else:
+
+                logger.error(
+                    "[CALENDAR] Failed sending: %s",
+                    event.get(
+                        "event",
+                        ""
+                    )
+                )
+
+        except Exception as e:
+
+            logger.exception(
+                "[CALENDAR] Event processing error: %s",
+                e
+            )
+
+
+# ============================================================
+# CLEAN OLD EVENT MEMORY
+# ============================================================
+
+def cleanup_event_memory(
+    sent_events
+):
+
+    if len(sent_events) <= 1000:
+        return sent_events
+
+    logger.info(
+        "[CALENDAR] Cleaning event memory..."
+    )
+
+    return set(
+        list(sent_events)[-500:]
+    )
+
+
+# ============================================================
+# CHECK NEWS
+# ============================================================
+
+def check_news(sent_news):
+
+    logger.info(
+        "[NEWS] Checking breaking news..."
+    )
+
+    try:
+
+        news_list = get_news(
+            limit=15
+        )
+
+        logger.info(
+            "[NEWS] Relevant news found: %s",
+            len(news_list)
+        )
+
+    except Exception as e:
+
+        logger.exception(
+            "[NEWS] Failed to get news: %s",
+            e
+        )
+
+        return
+
+    # oldest -> newest
+    for news in reversed(
+        news_list
+    ):
+
+        news_id = get_news_id(
+            news
+        )
+
+        if not news_id:
+            continue
+
+        # Jangan kirim berita yang sama
+        if news_id in sent_news:
+            continue
+
+        try:
+
+            message = format_news(
+                news
+            )
+
+        except Exception as e:
+
+            logger.error(
+                "[NEWS] Format error: %s",
+                e
+            )
+
+            continue
+
+        success = send_telegram(
+            message
+        )
+
+        if success:
+
+            sent_news.add(
+                news_id
+            )
+
+            logger.info(
+                "[NEWS] News sent: %s",
+                news.get(
+                    "title",
+                    ""
+                )
+            )
+
+        else:
+
+            logger.error(
+                "[NEWS] Failed to send: %s",
+                news.get(
+                    "title",
+                    ""
+                )
+            )
+
+
+# ============================================================
 # MAIN LOOP
 # ============================================================
 
@@ -138,7 +484,7 @@ def run():
     )
 
     logger.info(
-        "XAUUSD + OIL NEWS ASSISTANT STARTING"
+        "XAUUSD NEWS + GOLD CALENDAR ASSISTANT"
     )
 
     logger.info(
@@ -147,91 +493,75 @@ def run():
     )
 
     logger.info(
+        "Event alert window: %s hours",
+        EVENT_ALERT_HOURS
+    )
+
+    logger.info(
+        "Timezone: WITA"
+    )
+
+    logger.info(
         "======================================"
     )
 
+    # --------------------------------------------------------
+    # MEMORY
+    # --------------------------------------------------------
+
     sent_news = set()
+
+    sent_events = set()
+
+    # --------------------------------------------------------
+    # LOOP
+    # --------------------------------------------------------
 
     while True:
 
         try:
 
             logger.info(
-                "Checking breaking news..."
-            )
-
-            news_list = get_news(
-                limit=15
+                "======================================"
             )
 
             logger.info(
-                "Relevant news found: %s",
-                len(news_list)
+                "Checking market data..."
             )
 
-            # ====================================================
-            # SEND ONLY NEW NEWS
-            # ====================================================
+            # =================================================
+            # 1. INVESTINGLIVE NEWS
+            # =================================================
 
-            for news in reversed(news_list):
+            check_news(
+                sent_news
+            )
 
-                news_id = get_news_id(
-                    news
-                )
+            # =================================================
+            # 2. FOREX FACTORY GOLD EVENTS
+            # =================================================
 
-                if not news_id:
-                    continue
+            check_gold_events(
+                sent_events
+            )
 
-                # Jangan kirim berita yang sudah pernah dikirim
-                if news_id in sent_news:
-                    continue
+            # =================================================
+            # 3. MEMORY CLEANUP
+            # =================================================
 
-                try:
-
-                    message = format_news(
-                        news
-                    )
-
-                except Exception as e:
-
-                    logger.error(
-                        "Format news error: %s",
-                        e
-                    )
-
-                    continue
-
-                success = send_telegram(
-                    message
-                )
-
-                if success:
-
-                    sent_news.add(
-                        news_id
-                    )
-
-                    logger.info(
-                        "News sent: %s",
-                        news.get("title", "")
-                    )
-
-                else:
-
-                    logger.error(
-                        "Failed to send news: %s",
-                        news.get("title", "")
-                    )
-
-            # ====================================================
-            # MEMORY LIMIT
-            # ====================================================
-
-            if len(sent_news) > 1000:
-
-                sent_news = set(
+            sent_news = (
+                sent_news
+                if len(sent_news) <= 1000
+                else set(
                     list(sent_news)[-500:]
                 )
+            )
+
+            sent_events = (
+                cleanup_event_memory(
+                    sent_events
+                )
+            )
 
         except Exception as e:
 
@@ -240,9 +570,14 @@ def run():
                 e
             )
 
-        # ========================================================
+        # =====================================================
         # WAIT
-        # ========================================================
+        # =====================================================
+
+        logger.info(
+            "Next check in %s seconds...",
+            CHECK_INTERVAL
+        )
 
         time.sleep(
             CHECK_INTERVAL
