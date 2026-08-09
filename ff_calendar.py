@@ -1,5 +1,4 @@
 import re
-import time
 import logging
 from datetime import datetime, timedelta
 from html import unescape
@@ -17,6 +16,12 @@ FOREX_FACTORY_URL = "https://www.forexfactory.com/calendar"
 
 WITA = ZoneInfo("Asia/Makassar")
 
+REQUEST_TIMEOUT = 30
+
+# Alert 2 jam sebelum event
+ALERT_BEFORE_MINUTES = 120
+
+
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -24,20 +29,15 @@ HEADERS = {
         "Chrome/151.0.0.0 Safari/537.36"
     ),
     "Accept": (
-        "text/html,application/xhtml+xml,application/xml;"
-        "q=0.9,image/avif,image/webp,*/*;q=0.8"
+        "text/html,application/xhtml+xml,"
+        "application/xml;q=0.9,"
+        "image/avif,image/webp,*/*;q=0.8"
     ),
     "Accept-Language": "en-US,en;q=0.9",
     "Referer": "https://www.forexfactory.com/",
     "Connection": "keep-alive",
 }
 
-REQUEST_TIMEOUT = 30
-
-
-# ============================================================
-# LOGGING
-# ============================================================
 
 logger = logging.getLogger(__name__)
 
@@ -47,155 +47,271 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 GOLD_EVENTS = {
-    # US
+    # --------------------------------------------------------
+    # US INFLATION
+    # --------------------------------------------------------
+
     "CPI": "inflation",
     "Core CPI": "inflation",
+
     "PPI": "inflation",
     "Core PPI": "inflation",
+
     "PCE": "inflation",
     "Core PCE": "inflation",
 
+    # --------------------------------------------------------
+    # US EMPLOYMENT
+    # --------------------------------------------------------
+
     "Non-Farm Employment Change": "employment",
-    "Nonfarm Payrolls": "employment",
+    "Nonfarm Employment Change": "employment",
+
     "Non-Farm Payrolls": "employment",
+    "Nonfarm Payrolls": "employment",
+
     "NFP": "employment",
 
     "Unemployment Rate": "employment",
+
     "Average Hourly Earnings": "employment",
+
     "ADP Non-Farm Employment Change": "employment",
+
     "JOLTS Job Openings": "employment",
+
     "Initial Jobless Claims": "employment",
 
+    # --------------------------------------------------------
+    # FED
+    # --------------------------------------------------------
+
     "Federal Funds Rate": "fed",
+    "Fed Interest Rate Decision": "fed",
+
     "FOMC Statement": "fed",
+
     "FOMC Press Conference": "fed",
+
     "Fed Chair Powell Speaks": "fed",
+
     "Fed Chair Speaks": "fed",
 
+    # --------------------------------------------------------
+    # US GROWTH
+    # --------------------------------------------------------
+
     "GDP": "growth",
+
     "Retail Sales": "growth",
     "Core Retail Sales": "growth",
+
     "ISM Manufacturing PMI": "growth",
     "ISM Services PMI": "growth",
+
     "CB Consumer Confidence": "growth",
+
     "Michigan Consumer Sentiment": "growth",
 
-    # China
+    # --------------------------------------------------------
+    # CHINA
+    # --------------------------------------------------------
+
     "Chinese CPI": "china_inflation",
     "Chinese PPI": "china_inflation",
+
     "China CPI": "china_inflation",
     "China PPI": "china_inflation",
 
-    # Major central banks
+    # --------------------------------------------------------
+    # MAJOR CENTRAL BANKS
+    # --------------------------------------------------------
+
     "ECB Interest Rate Decision": "central_bank",
     "ECB Press Conference": "central_bank",
+
     "BoJ Interest Rate Decision": "central_bank",
+
     "BoE Interest Rate Decision": "central_bank",
+
     "RBA Interest Rate Decision": "central_bank",
 }
 
 
 # ============================================================
-# EVENT KEYWORD FALLBACK
+# EVENT KEYWORDS
 # ============================================================
 
 EVENT_KEYWORDS = [
     "cpi",
     "core cpi",
+
     "ppi",
     "core ppi",
+
     "pce",
     "core pce",
+
     "non-farm",
     "nonfarm",
     "payroll",
+
     "unemployment",
     "jobless claims",
     "jolts",
+
     "federal funds",
     "fomc",
     "fed chair",
     "powell",
+
     "retail sales",
+
     "gdp",
+
     "ism",
+
     "consumer confidence",
+
     "interest rate decision",
 ]
 
 
 # ============================================================
-# SESSION
+# REQUEST SESSION
 # ============================================================
 
 session = requests.Session()
-session.headers.update(HEADERS)
+
+session.headers.update(
+    HEADERS
+)
 
 
 # ============================================================
-# TEXT
+# CLEAN TEXT
 # ============================================================
 
 def clean_text(text):
+
     if not text:
         return ""
 
-    text = unescape(str(text))
+    text = unescape(
+        str(text)
+    )
 
-    text = re.sub(r"\s+", " ", text)
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    )
 
     return text.strip()
 
 
 # ============================================================
 # NORMALIZE EVENT NAME
+#
+# ISTILAH TRADING TIDAK DITERJEMAHKAN
 # ============================================================
 
 def normalize_event_name(name):
+
     name = clean_text(name)
 
     replacements = {
-        "Non-Farm Employment Change": "NFP",
-        "Nonfarm Employment Change": "NFP",
-        "Non-Farm Payrolls": "NFP",
-        "Nonfarm Payrolls": "NFP",
-        "Fed Interest Rate Decision": "Federal Funds Rate",
-        "Federal Funds Rate": "Federal Funds Rate",
+
+        "Non-Farm Employment Change":
+            "NFP",
+
+        "Nonfarm Employment Change":
+            "NFP",
+
+        "Non-Farm Payrolls":
+            "NFP",
+
+        "Nonfarm Payrolls":
+            "NFP",
+
+        "Fed Interest Rate Decision":
+            "Federal Funds Rate",
+
+        "Federal Funds Rate":
+            "Federal Funds Rate",
     }
 
-    return replacements.get(name, name)
+    return replacements.get(
+        name,
+        name
+    )
 
 
 # ============================================================
 # CHECK GOLD RELEVANCE
 # ============================================================
 
-def is_gold_event(event_name, currency, impact):
-    name = clean_text(event_name)
+def is_gold_event(
+    event_name,
+    currency,
+    impact
+):
+
+    name = clean_text(
+        event_name
+    )
+
     lower = name.lower()
 
-    currency = clean_text(currency).upper()
-    impact = clean_text(impact).lower()
+    currency = clean_text(
+        currency
+    ).upper()
 
-    # Hanya high impact untuk economic-event alert
+    impact = clean_text(
+        impact
+    ).lower()
+
+    # --------------------------------------------------------
+    # HANYA HIGH IMPACT
+    # --------------------------------------------------------
+
     if impact and "high" not in impact:
         return False
 
-    # USD adalah prioritas utama
+    # --------------------------------------------------------
+    # USD
+    # --------------------------------------------------------
+
     if currency == "USD":
+
         for keyword in EVENT_KEYWORDS:
+
             if keyword in lower:
                 return True
 
-    # China
-    if currency in ("CNY", "CNH"):
+    # --------------------------------------------------------
+    # CHINA
+    # --------------------------------------------------------
+
+    if currency in (
+        "CNY",
+        "CNH"
+    ):
+
         if any(
             keyword in lower
-            for keyword in ["cpi", "ppi", "inflation"]
+            for keyword in [
+                "cpi",
+                "ppi",
+                "inflation",
+            ]
         ):
             return True
 
-    # Major central bank
+    # --------------------------------------------------------
+    # CENTRAL BANK
+    # --------------------------------------------------------
+
     if any(
         keyword in lower
         for keyword in [
@@ -215,7 +331,10 @@ def is_gold_event(event_name, currency, impact):
 # ============================================================
 
 def impact_stars(impact):
-    value = clean_text(impact).lower()
+
+    value = clean_text(
+        impact
+    ).lower()
 
     if "high" in value:
         return "⭐⭐⭐⭐⭐"
@@ -230,46 +349,62 @@ def impact_stars(impact):
 # DATETIME PARSER
 # ============================================================
 
-def parse_event_datetime(date_text, time_text):
-    """
-    Forex Factory biasanya menggunakan:
-    date = YYYY-MM-DD / Today / Tomorrow
-    time = 8:30am / 10:00am
+def parse_event_datetime(
+    date_text,
+    time_text
+):
 
-    Parser dibuat fleksibel.
-    """
+    date_text = clean_text(
+        date_text
+    )
 
-    date_text = clean_text(date_text)
-    time_text = clean_text(time_text)
+    time_text = clean_text(
+        time_text
+    )
 
     if not time_text:
         return None
 
-    now = datetime.now(WITA)
+    now = datetime.now(
+        WITA
+    )
 
-    # Normalisasi waktu
-    time_text = time_text.lower().replace(" ", "")
+    time_text = (
+        time_text
+        .lower()
+        .replace(" ", "")
+    )
 
-    # Jika jam berupa All Day / Tentative
+    # --------------------------------------------------------
+    # NO EXACT TIME
+    # --------------------------------------------------------
+
     if time_text in {
         "all-day",
-        "all day",
+        "allday",
         "tentative",
         "day",
         "",
     }:
         return None
 
-    # Hari relatif
+    # --------------------------------------------------------
+    # DATE
+    # --------------------------------------------------------
+
     if date_text.lower() == "today":
+
         event_date = now.date()
 
     elif date_text.lower() == "tomorrow":
+
         event_date = (
-            now + timedelta(days=1)
+            now +
+            timedelta(days=1)
         ).date()
 
     else:
+
         parsed_date = None
 
         date_formats = [
@@ -281,38 +416,51 @@ def parse_event_datetime(date_text, time_text):
         ]
 
         for fmt in date_formats:
+
             try:
+
                 parsed_date = datetime.strptime(
                     date_text,
                     fmt
                 )
 
                 if "%Y" not in fmt:
-                    parsed_date = parsed_date.replace(
-                        year=now.year
+
+                    parsed_date = (
+                        parsed_date.replace(
+                            year=now.year
+                        )
                     )
 
                 break
 
             except ValueError:
+
                 continue
 
         if not parsed_date:
             return None
 
-        event_date = parsed_date.date()
+        event_date = (
+            parsed_date.date()
+        )
 
-    # Parse time
+    # --------------------------------------------------------
+    # TIME
+    # --------------------------------------------------------
+
+    parsed_time = None
+
     formats = [
         "%I:%M%p",
         "%I%p",
         "%H:%M",
     ]
 
-    parsed_time = None
-
     for fmt in formats:
+
         try:
+
             parsed_time = datetime.strptime(
                 time_text,
                 fmt
@@ -321,6 +469,7 @@ def parse_event_datetime(date_text, time_text):
             break
 
         except ValueError:
+
             continue
 
     if not parsed_time:
@@ -338,11 +487,13 @@ def parse_event_datetime(date_text, time_text):
 # ============================================================
 
 def fetch_calendar():
+
     logger.info(
         "[CALENDAR] Checking Forex Factory..."
     )
 
     try:
+
         response = session.get(
             FOREX_FACTORY_URL,
             timeout=REQUEST_TIMEOUT
@@ -354,26 +505,32 @@ def fetch_calendar():
         )
 
         if response.status_code != 200:
+
             logger.error(
                 "[CALENDAR] HTTP error: %s",
                 response.status_code
             )
-            return []
+
+            return ""
 
         return response.text
 
     except requests.exceptions.RequestException as e:
+
         logger.error(
             "[CALENDAR] Request error: %s",
             e
         )
+
         return ""
 
     except Exception as e:
+
         logger.exception(
             "[CALENDAR] Unexpected error: %s",
             e
         )
+
         return ""
 
 
@@ -382,6 +539,7 @@ def fetch_calendar():
 # ============================================================
 
 def parse_calendar(html):
+
     if not html:
         return []
 
@@ -392,15 +550,12 @@ def parse_calendar(html):
 
     events = []
 
-    # --------------------------------------------------------
-    # Forex Factory calendar rows
-    # --------------------------------------------------------
-
     rows = soup.select(
         "tr.calendar__row"
     )
 
     if not rows:
+
         rows = soup.select(
             "tr[class*='calendar']"
         )
@@ -415,15 +570,17 @@ def parse_calendar(html):
     for row in rows:
 
         try:
-            # ------------------------------------------------
+
+            # =================================================
             # DATE
-            # ------------------------------------------------
+            # =================================================
 
             date_node = row.select_one(
                 ".calendar__date"
             )
 
             if date_node:
+
                 date_text = clean_text(
                     date_node.get_text(
                         " ",
@@ -434,7 +591,12 @@ def parse_calendar(html):
                 if date_text:
                     current_date = date_text
 
-            if not current_date:
+            if current_date:
+
+                date_text = current_date
+
+            else:
+
                 date_text = clean_text(
                     row.get(
                         "data-date",
@@ -442,12 +604,9 @@ def parse_calendar(html):
                     )
                 )
 
-            else:
-                date_text = current_date
-
-            # ------------------------------------------------
+            # =================================================
             # TIME
-            # ------------------------------------------------
+            # =================================================
 
             time_node = row.select_one(
                 ".calendar__time"
@@ -456,6 +615,7 @@ def parse_calendar(html):
             time_text = ""
 
             if time_node:
+
                 time_text = clean_text(
                     time_node.get_text(
                         " ",
@@ -463,9 +623,9 @@ def parse_calendar(html):
                     )
                 )
 
-            # ------------------------------------------------
+            # =================================================
             # CURRENCY
-            # ------------------------------------------------
+            # =================================================
 
             currency_node = row.select_one(
                 ".calendar__currency"
@@ -474,6 +634,7 @@ def parse_calendar(html):
             currency = ""
 
             if currency_node:
+
                 currency = clean_text(
                     currency_node.get_text(
                         " ",
@@ -481,9 +642,9 @@ def parse_calendar(html):
                     )
                 )
 
-            # ------------------------------------------------
+            # =================================================
             # IMPACT
-            # ------------------------------------------------
+            # =================================================
 
             impact_node = row.select_one(
                 ".calendar__impact"
@@ -493,16 +654,15 @@ def parse_calendar(html):
 
             if impact_node:
 
-                title = clean_text(
+                impact = clean_text(
                     impact_node.get(
                         "title",
                         ""
                     )
                 )
 
-                impact = title
-
                 if not impact:
+
                     impact = clean_text(
                         impact_node.get_text(
                             " ",
@@ -510,15 +670,16 @@ def parse_calendar(html):
                         )
                     )
 
-            # ------------------------------------------------
+            # =================================================
             # EVENT
-            # ------------------------------------------------
+            # =================================================
 
             event_node = row.select_one(
                 ".calendar__event"
             )
 
             if not event_node:
+
                 event_node = row.select_one(
                     "[class*='calendar__event']"
                 )
@@ -526,6 +687,7 @@ def parse_calendar(html):
             event_name = ""
 
             if event_node:
+
                 event_name = clean_text(
                     event_node.get_text(
                         " ",
@@ -536,9 +698,9 @@ def parse_calendar(html):
             if not event_name:
                 continue
 
-            # ------------------------------------------------
+            # =================================================
             # FORECAST
-            # ------------------------------------------------
+            # =================================================
 
             forecast_node = row.select_one(
                 ".calendar__forecast"
@@ -547,6 +709,7 @@ def parse_calendar(html):
             forecast = ""
 
             if forecast_node:
+
                 forecast = clean_text(
                     forecast_node.get_text(
                         " ",
@@ -554,9 +717,9 @@ def parse_calendar(html):
                     )
                 )
 
-            # ------------------------------------------------
+            # =================================================
             # PREVIOUS
-            # ------------------------------------------------
+            # =================================================
 
             previous_node = row.select_one(
                 ".calendar__previous"
@@ -565,6 +728,7 @@ def parse_calendar(html):
             previous = ""
 
             if previous_node:
+
                 previous = clean_text(
                     previous_node.get_text(
                         " ",
@@ -572,9 +736,9 @@ def parse_calendar(html):
                     )
                 )
 
-            # ------------------------------------------------
+            # =================================================
             # ACTUAL
-            # ------------------------------------------------
+            # =================================================
 
             actual_node = row.select_one(
                 ".calendar__actual"
@@ -583,6 +747,7 @@ def parse_calendar(html):
             actual = ""
 
             if actual_node:
+
                 actual = clean_text(
                     actual_node.get_text(
                         " ",
@@ -590,18 +755,18 @@ def parse_calendar(html):
                     )
                 )
 
-            # ------------------------------------------------
+            # =================================================
             # DATETIME
-            # ------------------------------------------------
+            # =================================================
 
             event_datetime = parse_event_datetime(
                 date_text,
                 time_text
             )
 
-            # ------------------------------------------------
+            # =================================================
             # GOLD FILTER
-            # ------------------------------------------------
+            # =================================================
 
             if not is_gold_event(
                 event_name,
@@ -610,11 +775,13 @@ def parse_calendar(html):
             ):
                 continue
 
+            normalized = normalize_event_name(
+                event_name
+            )
+
             events.append(
                 {
-                    "event": normalize_event_name(
-                        event_name
-                    ),
+                    "event": normalized,
                     "original_event": event_name,
                     "currency": currency,
                     "impact": impact,
@@ -643,10 +810,11 @@ def parse_calendar(html):
 
 
 # ============================================================
-# FUNDAMENTAL RULES
+# NUMBER
 # ============================================================
 
 def clean_number(value):
+
     if not value:
         return None
 
@@ -667,19 +835,32 @@ def clean_number(value):
         return None
 
     try:
+
         return float(
             match.group(0)
         )
+
     except ValueError:
+
         return None
 
+
+# ============================================================
+# ACTUAL VS FORECAST
+# ============================================================
 
 def compare_actual_forecast(
     actual,
     forecast
 ):
-    a = clean_number(actual)
-    f = clean_number(forecast)
+
+    a = clean_number(
+        actual
+    )
+
+    f = clean_number(
+        forecast
+    )
 
     if a is None or f is None:
         return "unknown"
@@ -698,6 +879,7 @@ def compare_actual_forecast(
 # ============================================================
 
 def fundamental_analysis(event):
+
     name = event.get(
         "event",
         ""
@@ -713,17 +895,18 @@ def fundamental_analysis(event):
         ""
     )
 
-    category = ""
-
     lower = name.lower()
 
-    if "cpi" in lower or "pce" in lower:
-        category = "inflation"
+    # ========================================================
+    # CATEGORY
+    # ========================================================
 
-    elif (
-        "ppi" in lower
-        or "producer" in lower
+    if (
+        "cpi" in lower
+        or "pce" in lower
+        or "ppi" in lower
     ):
+
         category = "inflation"
 
     elif (
@@ -735,6 +918,7 @@ def fundamental_analysis(event):
         or "jolts" in lower
         or "wage" in lower
     ):
+
         category = "employment"
 
     elif (
@@ -743,6 +927,7 @@ def fundamental_analysis(event):
         or "ism" in lower
         or "consumer confidence" in lower
     ):
+
         category = "growth"
 
     elif (
@@ -752,7 +937,12 @@ def fundamental_analysis(event):
         or "fed chair" in lower
         or "interest rate decision" in lower
     ):
+
         category = "fed"
+
+    else:
+
+        category = "other"
 
     # ========================================================
     # PRE-EVENT
@@ -764,64 +954,69 @@ def fundamental_analysis(event):
 
             return {
                 "gold": (
-                    "Menunggu data CPI/PCE/PPI. "
+                    "Inflation data menjadi fokus utama. "
                     "Actual di bawah Forecast cenderung "
-                    "mendukung Gold."
+                    "mendukung Gold karena rate cut "
+                    "expectations dapat meningkat."
                 ),
                 "usd": (
-                    "Data inflation yang lebih rendah "
-                    "dapat menekan USD."
+                    "Inflation lebih rendah cenderung "
+                    "memberikan tekanan pada USD."
                 ),
                 "yield": (
-                    "Inflation yang lebih rendah dapat "
-                    "menekan Treasury Yield."
+                    "Treasury Yield berpotensi turun "
+                    "jika rate cut expectations meningkat."
                 ),
-                "bias": "🟡 NEUTRAL — MENUNGGU DATA",
+                "bias": (
+                    "🟡 NEUTRAL — MENUNGGU DATA"
+                ),
             }
 
         if category == "employment":
 
             return {
                 "gold": (
-                    "Menunggu data employment. "
-                    "Data lebih lemah dari Forecast "
-                    "cenderung mendukung Gold."
+                    "Employment data menjadi fokus. "
+                    "NFP atau employment yang lebih lemah "
+                    "dari Forecast cenderung bullish Gold."
                 ),
                 "usd": (
-                    "Employment yang lebih lemah "
-                    "dapat menekan USD."
+                    "Employment lemah dapat menekan USD."
                 ),
                 "yield": (
-                    "Data employment lemah dapat "
-                    "menekan Treasury Yield."
+                    "Treasury Yield berpotensi turun "
+                    "jika pasar meningkatkan rate cut expectations."
                 ),
-                "bias": "🟡 NEUTRAL — MENUNGGU DATA",
+                "bias": (
+                    "🟡 NEUTRAL — MENUNGGU DATA"
+                ),
             }
 
         if category == "growth":
 
             return {
                 "gold": (
-                    "Data growth dapat mengubah "
-                    "ekspektasi kebijakan Fed."
+                    "Growth data dapat mengubah "
+                    "rate expectations dan outlook Fed."
                 ),
                 "usd": (
-                    "Growth yang kuat cenderung "
-                    "mendukung USD."
+                    "Growth kuat cenderung mendukung USD."
                 ),
                 "yield": (
                     "Growth kuat dapat meningkatkan "
                     "Treasury Yield."
                 ),
-                "bias": "🟡 NEUTRAL — MENUNGGU DATA",
+                "bias": (
+                    "🟡 NEUTRAL — MENUNGGU DATA"
+                ),
             }
 
         if category == "fed":
 
             return {
                 "gold": (
-                    "Fokus pada arah kebijakan Fed "
-                    "dan perubahan rate expectations."
+                    "Fokus pada Fed guidance, "
+                    "rate expectations dan Treasury Yield."
                 ),
                 "usd": (
                     "Hawkish Fed cenderung bullish USD."
@@ -830,21 +1025,23 @@ def fundamental_analysis(event):
                     "Hawkish Fed cenderung menaikkan "
                     "Treasury Yield."
                 ),
-                "bias": "🟡 NEUTRAL — MENUNGGU FED",
+                "bias": (
+                    "🟡 NEUTRAL — MENUNGGU FED"
+                ),
             }
 
         return {
             "gold": (
-                "Potensi volatilitas tinggi. "
+                "Potensi volatility meningkat. "
                 "Tunggu reaksi XAUUSD."
             ),
-            "usd": "Tunggu reaksi USD.",
+            "usd": "Pantau USD.",
             "yield": "Pantau Treasury Yield.",
             "bias": "🟡 NEUTRAL",
         }
 
     # ========================================================
-    # POST-EVENT
+    # POST EVENT
     # ========================================================
 
     comparison = compare_actual_forecast(
@@ -852,9 +1049,9 @@ def fundamental_analysis(event):
         forecast
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # INFLATION
-    # --------------------------------------------------------
+    # ========================================================
 
     if category == "inflation":
 
@@ -862,7 +1059,7 @@ def fundamental_analysis(event):
 
             return {
                 "gold": (
-                    f"Actual {actual} berada di bawah "
+                    f"Actual {actual} di bawah "
                     f"Forecast {forecast}. "
                     "Inflation pressure lebih rendah."
                 ),
@@ -873,31 +1070,34 @@ def fundamental_analysis(event):
                 "yield": (
                     "Treasury Yield berpotensi turun."
                 ),
-                "bias": "🟢 BULLISH GOLD",
+                "bias": (
+                    "🟢 BULLISH GOLD"
+                ),
             }
 
         if comparison == "above":
 
             return {
                 "gold": (
-                    f"Actual {actual} berada di atas "
+                    f"Actual {actual} di atas "
                     f"Forecast {forecast}. "
                     "Inflation pressure lebih tinggi."
                 ),
                 "usd": (
                     "Higher-for-longer expectations "
-                    "berpotensi meningkat sehingga USD "
-                    "berpotensi menguat."
+                    "berpotensi meningkat."
                 ),
                 "yield": (
                     "Treasury Yield berpotensi naik."
                 ),
-                "bias": "🔴 BEARISH GOLD",
+                "bias": (
+                    "🔴 BEARISH GOLD"
+                ),
             }
 
-    # --------------------------------------------------------
+    # ========================================================
     # EMPLOYMENT
-    # --------------------------------------------------------
+    # ========================================================
 
     if category == "employment":
 
@@ -905,9 +1105,9 @@ def fundamental_analysis(event):
 
             return {
                 "gold": (
-                    f"Actual {actual} berada di bawah "
+                    f"Actual {actual} di bawah "
                     f"Forecast {forecast}. "
-                    "Employment menunjukkan pelemahan."
+                    "Employment lebih lemah dari ekspektasi."
                 ),
                 "usd": (
                     "USD berpotensi melemah karena "
@@ -916,14 +1116,16 @@ def fundamental_analysis(event):
                 "yield": (
                     "Treasury Yield berpotensi turun."
                 ),
-                "bias": "🟢 BULLISH GOLD",
+                "bias": (
+                    "🟢 BULLISH GOLD"
+                ),
             }
 
         if comparison == "above":
 
             return {
                 "gold": (
-                    f"Actual {actual} berada di atas "
+                    f"Actual {actual} di atas "
                     f"Forecast {forecast}. "
                     "Employment lebih kuat dari ekspektasi."
                 ),
@@ -933,12 +1135,14 @@ def fundamental_analysis(event):
                 "yield": (
                     "Treasury Yield berpotensi naik."
                 ),
-                "bias": "🔴 BEARISH GOLD",
+                "bias": (
+                    "🔴 BEARISH GOLD"
+                ),
             }
 
-    # --------------------------------------------------------
+    # ========================================================
     # GROWTH
-    # --------------------------------------------------------
+    # ========================================================
 
     if category == "growth":
 
@@ -946,8 +1150,8 @@ def fundamental_analysis(event):
 
             return {
                 "gold": (
-                    "Data growth lebih kuat dari Forecast. "
-                    "Ekspektasi kebijakan Fed yang lebih hawkish "
+                    "Growth lebih kuat dari Forecast. "
+                    "Ekspektasi Fed yang lebih hawkish "
                     "dapat menekan Gold."
                 ),
                 "usd": (
@@ -956,15 +1160,17 @@ def fundamental_analysis(event):
                 "yield": (
                     "Treasury Yield berpotensi naik."
                 ),
-                "bias": "🔴 BEARISH GOLD",
+                "bias": (
+                    "🔴 BEARISH GOLD"
+                ),
             }
 
         if comparison == "below":
 
             return {
                 "gold": (
-                    "Data growth lebih lemah dari Forecast. "
-                    "Ekspektasi kebijakan Fed yang lebih dovish "
+                    "Growth lebih lemah dari Forecast. "
+                    "Ekspektasi Fed yang lebih dovish "
                     "dapat mendukung Gold."
                 ),
                 "usd": (
@@ -973,20 +1179,22 @@ def fundamental_analysis(event):
                 "yield": (
                     "Treasury Yield berpotensi turun."
                 ),
-                "bias": "🟢 BULLISH GOLD",
+                "bias": (
+                    "🟢 BULLISH GOLD"
+                ),
             }
 
-    # --------------------------------------------------------
+    # ========================================================
     # FED
-    # --------------------------------------------------------
+    # ========================================================
 
     if category == "fed":
 
         return {
             "gold": (
                 "Fed event telah dirilis. "
-                "Analisis utama harus mempertimbangkan "
-                "perubahan rate expectations dan guidance."
+                "Fokus utama pada perubahan "
+                "rate expectations dan guidance."
             ),
             "usd": (
                 "Hawkish Fed → USD cenderung bullish. "
@@ -996,11 +1204,16 @@ def fundamental_analysis(event):
                 "Hawkish Fed → Treasury Yield cenderung naik. "
                 "Dovish Fed → Treasury Yield cenderung turun."
             ),
-            "bias": "🟡 ANALISIS GUIDANCE FED",
+            "bias": (
+                "🟡 ANALISIS GUIDANCE FED"
+            ),
         }
 
     return {
-        "gold": "Reaksi Gold bergantung pada detail data.",
+        "gold": (
+            "Reaksi Gold bergantung pada detail data "
+            "dan market expectations."
+        ),
         "usd": "Pantau USD.",
         "yield": "Pantau Treasury Yield.",
         "bias": "🟡 NEUTRAL",
@@ -1012,10 +1225,13 @@ def fundamental_analysis(event):
 # ============================================================
 
 def countdown(event_datetime):
+
     if not event_datetime:
         return None
 
-    now = datetime.now(WITA)
+    now = datetime.now(
+        WITA
+    )
 
     delta = (
         event_datetime - now
@@ -1026,6 +1242,7 @@ def countdown(event_datetime):
     )
 
     if seconds <= 0:
+
         return "EVENT SUDAH BERLANGSUNG"
 
     hours = seconds // 3600
@@ -1034,7 +1251,9 @@ def countdown(event_datetime):
         seconds % 3600
     ) // 60
 
-    secs = seconds % 60
+    secs = (
+        seconds % 60
+    )
 
     return (
         f"{hours:02d}:"
@@ -1050,6 +1269,7 @@ def countdown(event_datetime):
 def get_calendar_events(
     hours_ahead=48
 ):
+
     html = fetch_calendar()
 
     if not html:
@@ -1059,11 +1279,13 @@ def get_calendar_events(
         html
     )
 
-    now = datetime.now(WITA)
+    now = datetime.now(
+        WITA
+    )
 
     end = (
-        now
-        + timedelta(
+        now +
+        timedelta(
             hours=hours_ahead
         )
     )
@@ -1079,7 +1301,7 @@ def get_calendar_events(
         if not event_datetime:
             continue
 
-        if event_datetime < now:
+        if event_datetime <= now:
             continue
 
         if event_datetime > end:
@@ -1106,16 +1328,61 @@ def get_calendar_events(
 
 
 # ============================================================
+# 2-HOUR ALERT
+# ============================================================
+
+def is_two_hour_alert(event):
+
+    event_datetime = event.get(
+        "datetime"
+    )
+
+    if not event_datetime:
+        return False
+
+    now = datetime.now(
+        WITA
+    )
+
+    seconds_until = (
+        event_datetime - now
+    ).total_seconds()
+
+    # --------------------------------------------------------
+    # ALERT WINDOW
+    #
+    # 2 jam sebelum event sampai event dimulai
+    # --------------------------------------------------------
+
+    return (
+        0 < seconds_until <=
+        ALERT_BEFORE_MINUTES * 60
+    )
+
+
+# ============================================================
 # EVENT ID
 # ============================================================
 
 def get_event_id(event):
+
     return "|".join(
         [
-            event.get("event", ""),
-            event.get("currency", ""),
+            event.get(
+                "event",
+                ""
+            ),
+
+            event.get(
+                "currency",
+                ""
+            ),
+
             str(
-                event.get("datetime", "")
+                event.get(
+                    "datetime",
+                    ""
+                )
             ),
         ]
     )
@@ -1129,6 +1396,7 @@ def format_calendar_event(
     event,
     result=False
 ):
+
     event_datetime = event.get(
         "datetime"
     )
@@ -1144,6 +1412,7 @@ def format_calendar_event(
         )
 
     else:
+
         event_time = (
             f"{event.get('date', '')} "
             f"{event.get('time', '')}"
@@ -1162,23 +1431,32 @@ def format_calendar_event(
     else:
 
         header = (
-            "⏰ <b>GOLD ECONOMIC EVENT</b>"
+            "⏰ <b>GOLD EVENT ALERT</b>"
         )
 
-    actual = event.get(
-        "actual",
-        ""
-    ) or "-"
+    actual = (
+        event.get(
+            "actual",
+            ""
+        )
+        or "-"
+    )
 
-    forecast = event.get(
-        "forecast",
-        ""
-    ) or "-"
+    forecast = (
+        event.get(
+            "forecast",
+            ""
+        )
+        or "-"
+    )
 
-    previous = event.get(
-        "previous",
-        ""
-    ) or "-"
+    previous = (
+        event.get(
+            "previous",
+            ""
+        )
+        or "-"
+    )
 
     countdown_text = event.get(
         "countdown",
@@ -1189,10 +1467,10 @@ def format_calendar_event(
         f"{header}\n\n"
 
         f"📊 <b>{event.get('event', '')}</b>\n"
-        f"🌎 {event.get('currency', '')}\n"
+        f"🌎 Currency: {event.get('currency', '')}\n"
         f"🕐 {event_time} WITA\n\n"
 
-        f"⚠️ <b>HIGH IMPACT NEWS</b> "
+        f"⚠️ <b>HIGH IMPACT</b> "
         f"{event.get('stars', '⭐⭐⭐⭐⭐')}\n\n"
     )
 
@@ -1216,21 +1494,50 @@ def format_calendar_event(
 
         "🧠 <b>FUNDAMENTAL ANALYSIS</b>\n\n"
 
-        f"🟡 <b>GOLD</b>\n"
+        "🟡 <b>GOLD</b>\n"
         f"{analysis['gold']}\n\n"
 
-        f"💵 <b>USD</b>\n"
+        "💵 <b>USD</b>\n"
         f"{analysis['usd']}\n\n"
 
-        f"📈 <b>TREASURY YIELD</b>\n"
+        "📈 <b>TREASURY YIELD</b>\n"
         f"{analysis['yield']}\n\n"
 
         f"🎯 <b>FUNDAMENTAL BIAS</b>\n"
         f"{analysis['bias']}\n\n"
 
         "⚠️ <b>TRADING</b>\n"
-        "Tunggu reaksi awal XAUUSD dan "
-        "konfirmasi price action sebelum entry."
+        "Tunggu initial reaction XAUUSD "
+        "dan konfirmasi price action "
+        "sebelum entry."
     )
 
     return message
+
+
+# ============================================================
+# GET EVENTS THAT ARE WITHIN 2 HOURS
+# ============================================================
+
+def get_alert_events():
+
+    events = get_calendar_events(
+        hours_ahead=48
+    )
+
+    alert_events = []
+
+    for event in events:
+
+        if is_two_hour_alert(event):
+
+            alert_events.append(
+                event
+            )
+
+    logger.info(
+        "[CALENDAR] Events within 2 hours: %s",
+        len(alert_events)
+    )
+
+    return alert_events
