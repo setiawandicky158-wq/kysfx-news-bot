@@ -3,21 +3,17 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import hashlib
 import re
+import time
 
 
 BASE_URL = "https://investinglive.com"
 NEWS_URL = "https://investinglive.com/news/"
-
 
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/151.0.0.0 Safari/537.36"
-    ),
-    "Accept": (
-        "text/html,application/xhtml+xml,"
-        "application/xml;q=0.9,*/*;q=0.8"
     ),
     "Accept-Language": "en-US,en;q=0.9",
 }
@@ -33,15 +29,12 @@ GOLD_KEYWORDS = [
     "xauusd",
     "bullion",
     "precious metal",
-    "precious metals",
 ]
-
 
 USD_KEYWORDS = [
     "usd",
     "us dollar",
     "dollar",
-    "greenback",
     "dxy",
     "fed",
     "federal reserve",
@@ -52,7 +45,6 @@ USD_KEYWORDS = [
     "rate hike",
 ]
 
-
 YIELD_KEYWORDS = [
     "yield",
     "yields",
@@ -60,12 +52,10 @@ YIELD_KEYWORDS = [
     "10-year",
     "10 year",
     "10y",
-    "us10y",
     "bond yield",
 ]
 
-
-# OIL + WTI = SATU KATEGORI
+# OIL + WTI = SATU
 OIL_KEYWORDS = [
     "oil",
     "wti",
@@ -80,7 +70,6 @@ OIL_KEYWORDS = [
     "oil supply",
     "oil demand",
 ]
-
 
 HIGH_IMPACT_KEYWORDS = [
     "nfp",
@@ -196,79 +185,141 @@ CATEGORY_KEYWORDS = {
 
 
 # ============================================================
-# TRANSLATION
+# GOOGLE TRANSLATE
 # ============================================================
 
-TRANSLATIONS = {
-    "non-farm payrolls": "NFP",
-    "nonfarm payrolls": "NFP",
-    "non-farm payroll": "NFP",
-    "nonfarm payroll": "NFP",
+def translate_to_indonesian(text):
 
-    "employment report": "laporan ketenagakerjaan",
-    "unemployment rate": "tingkat pengangguran",
-    "jobless claims": "klaim pengangguran",
+    if not text:
+        return text
 
-    "rate hike": "kenaikan suku bunga",
-    "rate hikes": "kenaikan suku bunga",
-    "rate cut": "pemangkasan suku bunga",
-    "rate cuts": "pemangkasan suku bunga",
+    text = text.strip()
 
-    "interest rate": "suku bunga",
-    "interest rates": "suku bunga",
+    if not text:
+        return text
 
-    "inflation expectations": "ekspektasi inflasi",
-    "inflation": "inflasi",
+    try:
 
-    "consumer prices": "harga konsumen",
-    "producer prices": "harga produsen",
+        url = (
+            "https://translate.googleapis.com/"
+            "translate_a/single"
+        )
 
-    "retail sales": "penjualan ritel",
-    "economic growth": "pertumbuhan ekonomi",
+        params = {
+            "client": "gtx",
+            "sl": "en",
+            "tl": "id",
+            "dt": "t",
+            "q": text,
+        }
 
-    "US dollar": "dolar AS",
-    "dollar": "dolar AS",
+        response = requests.get(
+            url,
+            params=params,
+            headers=HEADERS,
+            timeout=20
+        )
 
-    "yields": "imbal hasil",
-    "yield": "imbal hasil",
+        if response.status_code != 200:
 
-    "treasury yields": "imbal hasil Treasury",
-    "treasury yield": "imbal hasil Treasury",
+            print(
+                "[TRANSLATE] HTTP",
+                response.status_code
+            )
 
-    "gold": "Gold",
-    "oil": "Oil",
-    "crude oil": "minyak mentah",
+            return text
 
-    "expected": "yang diperkirakan",
-    "forecast": "perkiraan",
-    "actual": "aktual",
+        data = response.json()
 
-    "higher than expected": "lebih tinggi dari perkiraan",
-    "lower than expected": "lebih rendah dari perkiraan",
+        translated = ""
 
-    "rises sharply": "naik tajam",
-    "rises": "naik",
-    "rose": "naik",
+        if data and data[0]:
 
-    "falls sharply": "turun tajam",
-    "falls": "turun",
-    "fell": "turun",
+            for item in data[0]:
 
-    "drops": "merosot",
-    "gains": "menguat",
-    "weakens": "melemah",
-    "strengthens": "menguat",
+                if item and item[0]:
+                    translated += item[0]
 
-    "advances": "menguat",
-    "declines": "melemah",
+        translated = translated.strip()
 
-    "week ahead": "agenda minggu depan",
-    "market news wrap": "ringkasan berita pasar",
-}
+        if translated:
+            return translated
+
+        return text
+
+    except Exception as e:
+
+        print(
+            "[TRANSLATE ERROR]",
+            type(e).__name__,
+            str(e)
+        )
+
+        return text
+
+
+def translate_long_text(text):
+
+    if not text:
+        return ""
+
+    text = text.strip()
+
+    if len(text) <= 4500:
+
+        return translate_to_indonesian(
+            text
+        )
+
+    # Pecah teks panjang menjadi beberapa bagian
+    sentences = re.split(
+        r"(?<=[.!?])\s+",
+        text
+    )
+
+    chunks = []
+    current = ""
+
+    for sentence in sentences:
+
+        if len(current) + len(sentence) > 4000:
+
+            if current:
+                chunks.append(
+                    current
+                )
+
+            current = sentence
+
+        else:
+
+            current += " " + sentence
+
+    if current:
+        chunks.append(
+            current
+        )
+
+    translated_chunks = []
+
+    for chunk in chunks:
+
+        translated_chunks.append(
+            translate_to_indonesian(
+                chunk
+            )
+        )
+
+        # Hindari terlalu banyak request
+        time.sleep(0.3)
+
+    return " ".join(
+        translated_chunks
+    )
 
 
 # ============================================================
-# TEXT HELPERS
+# HELPERS
 # ============================================================
 
 def clean_text(text):
@@ -315,30 +366,6 @@ def normalize_url(url):
     return url
 
 
-def translate_text(text):
-
-    if not text:
-        return text
-
-    result = text
-
-    # Frasa panjang diproses terlebih dahulu
-    for english, indonesian in sorted(
-        TRANSLATIONS.items(),
-        key=lambda x: len(x[0]),
-        reverse=True
-    ):
-
-        result = re.sub(
-            re.escape(english),
-            indonesian,
-            result,
-            flags=re.IGNORECASE
-        )
-
-    return result
-
-
 # ============================================================
 # CATEGORY
 # ============================================================
@@ -363,13 +390,11 @@ def detect_category(text):
 
 def calculate_impact(text):
 
-    text_lower = text.lower()
-
     score = 0
 
     for keyword in HIGH_IMPACT_KEYWORDS:
 
-        if keyword.lower() in text_lower:
+        if keyword.lower() in text.lower():
             score += 2
 
     if contains_keyword(
@@ -436,11 +461,6 @@ def get_article(url):
 
         if response.status_code != 200:
 
-            print(
-                "[ARTICLE] HTTP",
-                response.status_code
-            )
-
             return ""
 
         soup = BeautifulSoup(
@@ -491,6 +511,7 @@ def get_article(url):
                 if len(text) > len(
                     article_text
                 ):
+
                     article_text = text
 
         if len(article_text) < 200:
@@ -629,8 +650,8 @@ def analyze_usd(text):
         )
 
     return (
-        "Perhatikan arah dolar "
-        "setelah rilis data atau kebijakan."
+        "Perhatikan arah dolar setelah "
+        "rilis data atau kebijakan."
     )
 
 
@@ -874,16 +895,37 @@ def get_news(limit=10):
             href.encode("utf-8")
         ).hexdigest()
 
+        # ====================================================
+        # TERJEMAHKAN SELURUH HEADLINE
+        # ====================================================
+
+        print(
+            "[TRANSLATE] Headline:",
+            title
+        )
+
+        translated_title = (
+            translate_to_indonesian(
+                title
+            )
+        )
+
+        print(
+            "[TRANSLATE] Result:",
+            translated_title
+        )
+
+        # ====================================================
+        # ANALYSIS
+        # ====================================================
+
         result = {
+
             "id": news_id,
 
-            "title": translate_text(
-                title
-            ),
+            "title": translated_title,
 
-            "summary": translate_text(
-                article[:1000]
-            ),
+            "summary": "",
 
             "link": href,
 
