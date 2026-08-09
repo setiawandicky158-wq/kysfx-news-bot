@@ -3,8 +3,10 @@ import time
 import logging
 import requests
 
-from news import get_news, format_news
-from calendar import get_calendar_events, format_calendar_event
+from ff_calendar import (
+    get_calendar_events,
+    format_calendar_event
+)
 
 
 # ============================================================
