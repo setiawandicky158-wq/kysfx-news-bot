@@ -10,14 +10,24 @@ import html
 # ============================================================
 
 RSS_FEEDS = {
-    "CNBC": [
-        "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+    "CNBC Economy": [
+        "https://www.cnbc.com/id/20910258/device/rss/rss.html",
+    ],
+
+    "CNBC Energy": [
+        "https://www.cnbc.com/id/19836768/device/rss/rss.html",
+    ],
+
+    "CNBC Asia": [
+        "https://www.cnbc.com/id/19832390/device/rss/rss.html",
+    ],
+
+    "CNBC Earnings": [
         "https://www.cnbc.com/id/15839135/device/rss/rss.html",
     ],
 
     "MarketWatch": [
         "https://feeds.marketwatch.com/marketwatch/topstories/",
-        "https://feeds.marketwatch.com/marketwatch/marketpulse/",
     ],
 }
 
