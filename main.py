@@ -287,7 +287,11 @@ async def news_command(
 
                 message = format_news_message(
                     item,
-                    translate=False,
+                    translate=True,
+                )
+
+                logger.info(
+                    "[TRANSLATE] News formatted with Indonesian translation"
                 )
 
                 await update.message.reply_text(
