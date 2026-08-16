@@ -18,6 +18,11 @@ from config import (
 
 from state import state
 
+from news import (
+    get_news,
+    format_news_message,
+)
+
 
 # ============================================================
 # LOGGING
@@ -87,19 +92,15 @@ async def help_command(
         "/start — Memulai bot\n"
         "/status — Status bot\n"
         "/state — Database & memory bot\n"
+        "/news — Scan berita XAUUSD\n"
         "/help — Daftar command\n\n"
 
-        "🚧 <b>COMING NEXT</b>\n"
-        "/news — Berita XAUUSD\n"
-        "/calendar — Economic Calendar\n"
-        "/brief — Market Brief\n"
-        "/session — Status session\n\n"
-
-        "📊 <b>ENGINE STATUS</b>\n"
-        "News Engine: ⏳ BUILDING\n"
-        "Calendar Engine: ⏳ BUILDING\n"
-        "Market Engine: ⏳ BUILDING\n"
-        "Session Engine: ⏳ BUILDING"
+        "🚧 <b>ENGINE STATUS</b>\n"
+        "🚨 News Engine: 🟢 ACTIVE\n"
+        "📅 Calendar Engine: ⏳ BUILDING\n"
+        "🧠 Market Engine: ⏳ BUILDING\n"
+        "🌏 Session Engine: ⏳ BUILDING\n"
+        "📊 Market Brief: ⏳ BUILDING"
     )
 
     await update.message.reply_text(
@@ -120,6 +121,7 @@ async def status_command(
     now = datetime.now(WITA)
 
     try:
+
         total_records = state.total()
         database_status = "🟢 OK"
 
@@ -146,10 +148,11 @@ async def status_command(
         f"🕐 WITA:\n"
         f"<code>{now:%d-%m-%Y %H:%M:%S}</code>\n\n"
 
-        "🚨 News Engine: ⏳ BUILDING\n"
+        "🚨 News Engine: 🟢 ACTIVE\n"
         "📅 Calendar Engine: ⏳ BUILDING\n"
         "🧠 Market Engine: ⏳ BUILDING\n"
-        "🌏 Session Engine: ⏳ BUILDING"
+        "🌏 Session Engine: ⏳ BUILDING\n"
+        "📊 Market Brief: ⏳ BUILDING"
     )
 
     await update.message.reply_text(
@@ -226,6 +229,101 @@ async def state_command(
 
 
 # ============================================================
+# /NEWS
+# ============================================================
+
+async def news_command(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+
+    logger.info(
+        "[NEWS] Manual /news requested"
+    )
+
+    await update.message.reply_text(
+        "🔎 <b>SCANNING NEWS...</b>\n\n"
+        "Sedang mencari berita relevan "
+        "untuk Gold, XAUUSD, USD, Yield, "
+        "dan Oil.\n\n"
+        "⏳ Mohon tunggu...",
+        parse_mode="HTML",
+    )
+
+    try:
+
+        results = get_news(
+            limit=10
+        )
+
+        logger.info(
+            "[NEWS] Scan completed | results=%s",
+            len(results),
+        )
+
+        if not results:
+
+            await update.message.reply_text(
+                "📰 <b>NEWS SCAN</b>\n\n"
+                "Tidak ditemukan berita relevan "
+                "untuk XAUUSD/USD/Gold/Yield/Oil "
+                "dalam periode scan.",
+                parse_mode="HTML",
+            )
+
+            return
+
+        await update.message.reply_text(
+            "📰 <b>NEWS ENGINE RESULT</b>\n\n"
+            f"Ditemukan "
+            f"<b>{len(results)}</b> berita relevan.",
+            parse_mode="HTML",
+        )
+
+        # Kirim maksimal 5 berita pada manual scan
+        for item in results[:5]:
+
+            try:
+
+                message = format_news_message(
+                    item,
+                    translate=False,
+                )
+
+                await update.message.reply_text(
+                    message,
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                )
+
+            except Exception as exc:
+
+                logger.warning(
+                    "[NEWS] Failed formatting item: %s",
+                    exc,
+                )
+
+        logger.info(
+            "[NEWS] /news completed successfully"
+        )
+
+    except Exception as exc:
+
+        logger.error(
+            "[NEWS] /news failed: %s",
+            exc,
+            exc_info=True,
+        )
+
+        await update.message.reply_text(
+            "🔴 <b>NEWS ENGINE ERROR</b>\n\n"
+            "News Engine mengalami error.\n\n"
+            f"<code>{str(exc)[:1500]}</code>",
+            parse_mode="HTML",
+        )
+
+
+# ============================================================
 # ERROR HANDLER
 # ============================================================
 
@@ -244,7 +342,7 @@ async def error_handler(
 
 
 # ============================================================
-# DATABASE STARTUP TEST
+# DATABASE TEST
 # ============================================================
 
 def test_database():
@@ -295,7 +393,7 @@ def main():
     )
 
     # --------------------------------------------------------
-    # CONFIG VALIDATION
+    # CONFIGURATION
     # --------------------------------------------------------
 
     try:
@@ -321,10 +419,6 @@ def main():
 
     if not test_database():
 
-        logger.critical(
-            "[STATE] Database test failed"
-        )
-
         raise RuntimeError(
             "SQLite database initialization failed"
         )
@@ -340,7 +434,7 @@ def main():
     )
 
     # --------------------------------------------------------
-    # COMMAND HANDLERS
+    # COMMANDS
     # --------------------------------------------------------
 
     application.add_handler(
@@ -371,6 +465,13 @@ def main():
         )
     )
 
+    application.add_handler(
+        CommandHandler(
+            "news",
+            news_command,
+        )
+    )
+
     # --------------------------------------------------------
     # ERROR HANDLER
     # --------------------------------------------------------
@@ -380,7 +481,7 @@ def main():
     )
 
     # --------------------------------------------------------
-    # START POLLING
+    # POLLING
     # --------------------------------------------------------
 
     logger.info(
