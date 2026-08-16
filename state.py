@@ -5,19 +5,38 @@ from datetime import datetime, timezone
 from config import DATABASE_FILE
 
 
+# ============================================================
+# STATE DATABASE
+# ============================================================
+
 class StateManager:
+    """
+    Persistent state manager untuk KYSFX Bot.
+
+    Digunakan untuk:
+    - anti duplicate news
+    - calendar alerts
+    - calendar results
+    - session alerts
+    - system events
+    """
 
     def __init__(self, database_file=DATABASE_FILE):
+
         self.database_file = database_file
-        self.lock = threading.Lock()
+
+        # Mencegah konflik SQLite ketika beberapa
+        # bagian bot mengakses database bersamaan.
+        self.lock = threading.RLock()
 
         self._initialize_database()
 
     # ========================================================
-    # DATABASE INITIALIZATION
+    # DATABASE CONNECTION
     # ========================================================
 
     def _connect(self):
+
         connection = sqlite3.connect(
             self.database_file,
             timeout=30,
@@ -28,7 +47,15 @@ class StateManager:
             "PRAGMA journal_mode=WAL"
         )
 
+        connection.execute(
+            "PRAGMA busy_timeout=30000"
+        )
+
         return connection
+
+    # ========================================================
+    # INITIALIZE
+    # ========================================================
 
     def _initialize_database(self):
 
@@ -58,19 +85,26 @@ class StateManager:
                     """
                 )
 
+                cursor.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS
+                    idx_sent_items_created
+                    ON sent_items(created_at)
+                    """
+                )
+
                 connection.commit()
 
             finally:
+
                 connection.close()
 
     # ========================================================
-    # CHECK
+    # CHECK ITEM
     # ========================================================
 
-    def exists(
-        self,
-        item_key,
-    ):
+    def exists(self, item_key):
+
         with self.lock:
 
             connection = self._connect()
@@ -89,13 +123,16 @@ class StateManager:
                     (item_key,),
                 )
 
-                return cursor.fetchone() is not None
+                result = cursor.fetchone()
+
+                return result is not None
 
             finally:
+
                 connection.close()
 
     # ========================================================
-    # MARK
+    # MARK ITEM
     # ========================================================
 
     def mark_sent(
@@ -133,10 +170,11 @@ class StateManager:
                 connection.commit()
 
             finally:
+
                 connection.close()
 
     # ========================================================
-    # CHECK + MARK ATOMIC
+    # CHECK + MARK
     # ========================================================
 
     def check_and_mark(
@@ -144,6 +182,12 @@ class StateManager:
         item_key,
         item_type,
     ):
+        """
+        Atomic anti-duplicate operation.
+
+        True  = item baru, boleh dikirim.
+        False = sudah pernah dikirim.
+        """
 
         with self.lock:
 
@@ -164,6 +208,7 @@ class StateManager:
                 )
 
                 if cursor.fetchone():
+
                     return False
 
                 cursor.execute(
@@ -189,16 +234,46 @@ class StateManager:
                 return True
 
             finally:
+
+                connection.close()
+
+    # ========================================================
+    # REMOVE ITEM
+    # ========================================================
+
+    def remove(self, item_key):
+
+        with self.lock:
+
+            connection = self._connect()
+
+            try:
+
+                cursor = connection.cursor()
+
+                cursor.execute(
+                    """
+                    DELETE FROM sent_items
+                    WHERE item_key = ?
+                    """,
+                    (item_key,),
+                )
+
+                deleted = cursor.rowcount
+
+                connection.commit()
+
+                return deleted > 0
+
+            finally:
+
                 connection.close()
 
     # ========================================================
     # CLEAN OLD DATA
     # ========================================================
 
-    def cleanup(
-        self,
-        days=30,
-    ):
+    def cleanup(self, days=30):
 
         with self.lock:
 
@@ -217,7 +292,7 @@ class StateManager:
                     )
                     """,
                     (
-                        f"-{days} days",
+                        f"-{int(days)} days",
                     ),
                 )
 
@@ -228,10 +303,42 @@ class StateManager:
                 return deleted
 
             finally:
+
                 connection.close()
 
     # ========================================================
-    # STATS
+    # COUNT BY TYPE
+    # ========================================================
+
+    def count_type(self, item_type):
+
+        with self.lock:
+
+            connection = self._connect()
+
+            try:
+
+                cursor = connection.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM sent_items
+                    WHERE item_type = ?
+                    """,
+                    (item_type,),
+                )
+
+                result = cursor.fetchone()
+
+                return int(result[0])
+
+            finally:
+
+                connection.close()
+
+    # ========================================================
+    # GLOBAL STATS
     # ========================================================
 
     def stats(self):
@@ -246,7 +353,9 @@ class StateManager:
 
                 cursor.execute(
                     """
-                    SELECT item_type, COUNT(*)
+                    SELECT
+                        item_type,
+                        COUNT(*)
                     FROM sent_items
                     GROUP BY item_type
                     ORDER BY item_type
@@ -256,6 +365,69 @@ class StateManager:
                 return cursor.fetchall()
 
             finally:
+
+                connection.close()
+
+    # ========================================================
+    # TOTAL
+    # ========================================================
+
+    def total(self):
+
+        with self.lock:
+
+            connection = self._connect()
+
+            try:
+
+                cursor = connection.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM sent_items
+                    """
+                )
+
+                result = cursor.fetchone()
+
+                return int(result[0])
+
+            finally:
+
+                connection.close()
+
+    # ========================================================
+    # RECENT ITEMS
+    # ========================================================
+
+    def recent(self, limit=20):
+
+        with self.lock:
+
+            connection = self._connect()
+
+            try:
+
+                cursor = connection.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT
+                        item_key,
+                        item_type,
+                        created_at
+                    FROM sent_items
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (int(limit),),
+                )
+
+                return cursor.fetchall()
+
+            finally:
+
                 connection.close()
 
 
