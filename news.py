@@ -1524,14 +1524,16 @@ def translate_to_indonesian(
 def direction_text(
     direction,
 ):
-    return {
-        "BULLISH": "📈 Bullish",
-        "BEARISH": "📉 Bearish",
-        "NEUTRAL": "Neutral",
-    }.get(
-        direction,
-        "Neutral",
-    )
+    # Normalize display input without changing the analysis result.
+    value = str(direction or "").strip().upper()
+
+    if value == "BULLISH":
+        return "📈 Bullish"
+
+    if value == "BEARISH":
+        return "📉 Bearish"
+
+    return "Neutral"
 
 
 def gold_conclusion(
