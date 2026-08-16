@@ -271,130 +271,165 @@ HIGH_IMPACT_KEYWORDS = {
 
 
 # ============================================================
-# DIRECTION KEYWORDS
+# DIRECTION KEYWORDS - CONTEXT AWARE V3
 # ============================================================
 
+# Direct market movement terms. These describe the asset itself.
 USD_BULLISH = [
-    "dollar rises",
-    "dollar rose",
-    "dollar gains",
-    "dollar gained",
-    "dollar strengthens",
-    "dollar strengthened",
-    "usd rises",
-    "usd gains",
-    "dxy rises",
-    "dxy gains",
-    "dollar climbs",
-    "dollar climbed",
-    "dollar jumps",
-    "dollar jumped",
+    "dollar rises", "dollar rose", "dollar gains", "dollar gained",
+    "dollar strengthens", "dollar strengthened", "dollar climbs",
+    "dollar climbed", "dollar jumps", "dollar jumped", "dollar firms",
+    "dollar firmed", "usd rises", "usd gains", "usd strengthens",
+    "dxy rises", "dxy gains", "dxy climbs", "dxy jumped",
 ]
-
 
 USD_BEARISH = [
-    "dollar falls",
-    "dollar fell",
-    "dollar drops",
-    "dollar declined",
-    "dollar weakens",
-    "dollar weakened",
-    "usd falls",
-    "usd drops",
-    "dxy falls",
-    "dxy drops",
-    "dollar slips",
-    "dollar slipped",
+    "dollar falls", "dollar fell", "dollar drops", "dollar declined",
+    "dollar weakens", "dollar weakened", "dollar slips", "dollar slipped",
+    "dollar loses ground", "usd falls", "usd drops", "usd weakens",
+    "dxy falls", "dxy drops", "dxy declines", "dxy slipped",
 ]
-
 
 YIELD_BULLISH = [
-    "yields rise",
-    "yields rose",
-    "yield rises",
-    "yield rose",
-    "yields climb",
-    "yield climbs",
-    "yields higher",
-    "yield higher",
-    "yields jump",
-    "yield jumps",
+    "yields rise", "yields rose", "yield rises", "yield rose",
+    "yields climb", "yield climbs", "yields higher", "yield higher",
+    "yields jump", "yield jumps", "yields surged", "yield surged",
+    "yields increase", "yield increases", "yield increased",
 ]
-
 
 YIELD_BEARISH = [
-    "yields fall",
-    "yields fell",
-    "yield falls",
-    "yield fell",
-    "yields decline",
-    "yield declines",
-    "yields lower",
-    "yield lower",
-    "yields drop",
-    "yield drops",
+    "yields fall", "yields fell", "yield falls", "yield fell",
+    "yields decline", "yield declines", "yields lower", "yield lower",
+    "yields drop", "yield drops", "yields slipped", "yield slipped",
+    "yields decrease", "yield decreases", "yield decreased",
 ]
 
+GOLD_BULLISH = [
+    "gold rises", "gold rose", "gold gains", "gold gained",
+    "gold advances", "gold advanced", "gold climbs", "gold climbed",
+    "gold jumps", "gold jumped", "gold rallies", "gold rallied",
+    "gold heads for a gain", "gold heads for weekly gain",
+    "gold set for weekly gain", "gold poised for gains",
+    "gold prices rise", "gold prices rose", "gold prices gain",
+    "gold prices gained", "gold prices climb", "gold prices climbed",
+    "gold prices advance", "gold prices advanced",
+]
+
+GOLD_BEARISH = [
+    "gold falls", "gold fell", "gold drops", "gold dropped",
+    "gold declines", "gold declined", "gold retreats", "gold retreated",
+    "gold slips", "gold slipped", "gold loses ground",
+    "gold prices fall", "gold prices fell", "gold prices drop",
+    "gold prices dropped", "gold prices decline", "gold prices declined",
+]
 
 OIL_BULLISH = [
-    "oil rises",
-    "oil rose",
-    "oil gains",
-    "oil gained",
-    "oil prices rise",
-    "oil prices rose",
-    "crude rises",
-    "crude rose",
-    "wti rises",
-    "wti rose",
+    "oil rises", "oil rose", "oil gains", "oil gained", "oil climbs",
+    "oil climbed", "oil jumps", "oil jumped", "oil rallies", "oil rallied",
+    "oil prices rise", "oil prices rose", "oil prices gain", "oil prices gained",
+    "crude rises", "crude rose", "wti rises", "wti rose", "wti gains",
+    "wti gained", "wti climbs", "wti climbed",
 ]
-
 
 OIL_BEARISH = [
-    "oil falls",
-    "oil fell",
-    "oil drops",
-    "oil declined",
-    "oil prices fall",
-    "oil prices fell",
-    "crude falls",
-    "crude fell",
-    "wti falls",
-    "wti fell",
+    "oil falls", "oil fell", "oil drops", "oil dropped", "oil declines",
+    "oil declined", "oil retreats", "oil retreated", "oil slips", "oil slipped",
+    "oil prices fall", "oil prices fell", "oil prices drop", "oil prices dropped",
+    "crude falls", "crude fell", "wti falls", "wti fell", "wti drops", "wti dropped",
 ]
 
-
+# These are deliberately NOT used as standalone hawkish/dovish signals.
+# "rate hike" by itself says what policy is, not what happened to expectations.
 HAWKISH_TERMS = [
-    "hawkish",
-    "higher for longer",
-    "rate hike",
-    "rate hikes",
-    "raise rates",
-    "raises rates",
-    "raising rates",
-    "tightening",
-    "higher rates",
-    "restrictive policy",
-    "restrictive monetary",
+    "hawkish", "higher for longer", "raise rates", "raises rates",
+    "raising rates", "rate hikes are likely", "more rate hikes",
+    "additional rate hikes", "further rate hikes", "tightening",
+    "higher rates", "restrictive policy", "restrictive monetary",
 ]
-
 
 DOVISH_TERMS = [
-    "dovish",
-    "rate cut",
-    "rate cuts",
-    "cut rates",
-    "cuts rates",
-    "cutting rates",
-    "easing",
-    "lower rates",
-    "accommodative",
-    "monetary easing",
+    "dovish", "rate cuts are likely", "more rate cuts", "additional rate cuts",
+    "further rate cuts", "cut rates", "cuts rates", "cutting rates",
+    "easing", "lower rates", "accommodative", "monetary easing",
 ]
+
+# Context rules. The direction is determined by the movement of expectations,
+# not by the presence of the words "rate hike" / "rate cut" alone.
+RATE_HIKE_DOVISH_PATTERNS = [
+    r"(?:rate|rates)\s+(?:hike|hikes|hike odds|hike expectations|hiking)\b[^.]{0,80}\b(?:fall|fell|falls|decline|declined|declines|drop|dropped|drops|slip|slipped|lower|lowered|reduce|reduced|decrease|decreased|cut|cuts|hit)\b",
+    r"\b(?:fall|fell|falls|decline|declined|declines|drop|dropped|drops|slip|slipped|lower|lowered|reduce|reduced|decrease|decreased)\b[^.]{0,80}\b(?:rate|rates)\s+(?:hike|hikes|hiking)\b",
+    r"\b(?:hit|blow|setback)\b[^.]{0,80}\b(?:fed\s+)?rate\s+hike\s+(?:odds|expectations|bets)\b",
+    r"\b(?:lower|lowered|reduced|decreased|falling|declining)\b[^.]{0,80}\b(?:rate\s+hike|hike)\s+(?:odds|expectations|bets)\b",
+    r"\b(?:fewer|less)\s+(?:rate\s+)?hikes?\b",
+    r"\b(?:odds|expectations|bets)\s+(?:of|for)\s+(?:a\s+)?rate\s+hike\s+(?:fall|fell|falls|decline|declined|drop|dropped|slip|slipped|lower|reduced|decrease)\b",
+]
+
+RATE_HIKE_HAWKISH_PATTERNS = [
+    r"(?:rate|rates)\s+(?:hike|hikes|hiking)\b[^.]{0,80}\b(?:rise|rose|rises|increase|increased|increases|jump|jumped|jumps|higher|boost|boosted|strengthen|strengthened)\b",
+    r"\b(?:rise|rose|rises|increase|increased|increases|jump|jumped|jumps|higher|boost|boosted)\b[^.]{0,80}\b(?:rate\s+hike|hike)\s+(?:odds|expectations|bets)\b",
+    r"\b(?:higher|increased|increasing|rising|stronger)\b[^.]{0,80}\b(?:rate\s+hike|hike)\s+(?:odds|expectations|bets)\b",
+    r"\b(?:more|additional|further)\s+(?:rate\s+)?hikes?\b",
+    r"\b(?:odds|expectations|bets)\s+(?:of|for)\s+(?:a\s+)?rate\s+hike\s+(?:rise|rose|rises|increase|increased|increase|jump|jumped|higher)\b",
+]
+
+RATE_CUT_DOVISH_PATTERNS = [
+    r"(?:rate|rates)\s+(?:cut|cuts|cutting)\b[^.]{0,80}\b(?:rise|rose|rises|increase|increased|increases|jump|jumped|higher|boost|boosted)\b",
+    r"\b(?:rise|rose|rises|increase|increased|increases|jump|jumped|higher)\b[^.]{0,80}\b(?:rate\s+cut|cut)\s+(?:odds|expectations|bets)\b",
+    r"\b(?:higher|increased|increasing|rising|stronger)\b[^.]{0,80}\b(?:rate\s+cut|cut)\s+(?:odds|expectations|bets)\b",
+    r"\b(?:more|additional|further)\s+(?:rate\s+)?cuts?\b",
+]
+
+RATE_CUT_HAWKISH_PATTERNS = [
+    r"(?:rate|rates)\s+(?:cut|cuts|cutting)\b[^.]{0,80}\b(?:fall|fell|falls|decline|declined|drop|dropped|slip|slipped|lower|reduced|decrease|decreased|hit)\b",
+    r"\b(?:fall|fell|falls|decline|declined|drop|dropped|slip|slipped|lower|reduced|decrease|decreased)\b[^.]{0,80}\b(?:rate\s+cut|cut)\s+(?:odds|expectations|bets)\b",
+    r"\b(?:fewer|less)\s+(?:rate\s+)?cuts?\b",
+]
+
+
+def _has_any(text, terms):
+    return any(term in text for term in terms)
+
+
+def _has_pattern(text, patterns):
+    return any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in patterns)
+
+
+def _fed_policy_bias(text):
+    """
+    Return +1 for dovish, -1 for hawkish, 0 for neutral/unclear.
+
+    IMPORTANT: "rate hike" alone is neutral. We first look for contextual
+    movement in hike/cut odds or expectations, then explicit Fed language.
+    """
+    dovish_score = 0
+    hawkish_score = 0
+
+    # Explicit expectation changes have highest priority.
+    if _has_pattern(text, RATE_HIKE_DOVISH_PATTERNS):
+        dovish_score += 4
+    if _has_pattern(text, RATE_HIKE_HAWKISH_PATTERNS):
+        hawkish_score += 4
+    if _has_pattern(text, RATE_CUT_DOVISH_PATTERNS):
+        dovish_score += 4
+    if _has_pattern(text, RATE_CUT_HAWKISH_PATTERNS):
+        hawkish_score += 4
+
+    # Explicit policy language.
+    if _has_any(text, DOVISH_TERMS):
+        dovish_score += 2
+    if _has_any(text, HAWKISH_TERMS):
+        hawkish_score += 2
+
+    if dovish_score > hawkish_score:
+        return 1
+    if hawkish_score > dovish_score:
+        return -1
+    return 0
 
 
 # ============================================================
 # BLOCKED TITLES
+
 # ============================================================
 
 BLOCKED_TITLE_KEYWORDS = [
@@ -863,129 +898,112 @@ def directional_analysis(
     title,
     summary,
 ):
+    """Context-aware market direction engine.
 
-    text = (
+    Sign convention:
+      GOLD +1 = bullish for XAUUSD
+      USD  +1 = USD bullish
+      YIELD +1 = yield bullish (normally bearish for gold)
+      OIL  +1 = oil bullish
+
+    The engine combines direct price language with macro causality. It never
+    treats the phrase "rate hike" alone as hawkish.
+    """
+    text = normalize_text(
         f"{title} {summary}"
     ).lower()
 
-    gold = "NEUTRAL"
-    usd = "NEUTRAL"
-    yield_bias = "NEUTRAL"
-    oil = "NEUTRAL"
+    gold_score = 0
+    usd_score = 0
+    yield_score = 0
+    oil_score = 0
 
     # --------------------------------------------------------
-    # HAWKISH / DOVISH
+    # DIRECT ASSET MOVEMENT
     # --------------------------------------------------------
+    if _has_any(text, GOLD_BULLISH):
+        gold_score += 3
+    if _has_any(text, GOLD_BEARISH):
+        gold_score -= 3
 
-    hawkish = any(
-        term in text
-        for term in HAWKISH_TERMS
-    )
+    if _has_any(text, USD_BULLISH):
+        usd_score += 3
+    if _has_any(text, USD_BEARISH):
+        usd_score -= 3
 
-    dovish = any(
-        term in text
-        for term in DOVISH_TERMS
-    )
+    if _has_any(text, YIELD_BULLISH):
+        yield_score += 3
+    if _has_any(text, YIELD_BEARISH):
+        yield_score -= 3
 
-    if hawkish and not dovish:
-
-        usd = "BULLISH"
-        yield_bias = "BULLISH"
-        gold = "BEARISH"
-
-    elif dovish and not hawkish:
-
-        usd = "BEARISH"
-        yield_bias = "BEARISH"
-        gold = "BULLISH"
+    if _has_any(text, OIL_BULLISH):
+        oil_score += 3
+    if _has_any(text, OIL_BEARISH):
+        oil_score -= 3
 
     # --------------------------------------------------------
-    # USD
+    # FED / RATE EXPECTATIONS
     # --------------------------------------------------------
+    # +1 = dovish, -1 = hawkish
+    policy_bias = _fed_policy_bias(text)
 
-    if any(
-        term in text
-        for term in USD_BULLISH
-    ):
-
-        usd = "BULLISH"
-
-        if gold == "NEUTRAL":
-            gold = "BEARISH"
-
-    elif any(
-        term in text
-        for term in USD_BEARISH
-    ):
-
-        usd = "BEARISH"
-
-        if gold == "NEUTRAL":
-            gold = "BULLISH"
+    if policy_bias > 0:
+        # Dovish Fed -> lower rate expectations -> usually weaker USD/yields
+        # and supportive for gold.
+        usd_score -= 3
+        yield_score -= 3
+        gold_score += 4
+    elif policy_bias < 0:
+        # Hawkish Fed -> higher rate expectations -> usually stronger USD/yields
+        # and negative for gold.
+        usd_score += 3
+        yield_score += 3
+        gold_score -= 4
 
     # --------------------------------------------------------
-    # YIELD
+    # SAFE-HAVEN / GEOPOLITICAL RISK
     # --------------------------------------------------------
-
-    if any(
-        term in text
-        for term in YIELD_BULLISH
-    ):
-
-        yield_bias = "BULLISH"
-
-        if gold == "NEUTRAL":
-            gold = "BEARISH"
-
-    elif any(
-        term in text
-        for term in YIELD_BEARISH
-    ):
-
-        yield_bias = "BEARISH"
-
-        if gold == "NEUTRAL":
-            gold = "BULLISH"
-
-    # --------------------------------------------------------
-    # OIL
-    # --------------------------------------------------------
-
-    if any(
-        term in text
-        for term in OIL_BULLISH
-    ):
-
-        oil = "BULLISH"
-
-    elif any(
-        term in text
-        for term in OIL_BEARISH
-    ):
-
-        oil = "BEARISH"
-
-    # --------------------------------------------------------
-    # SAFE HAVEN
-    # --------------------------------------------------------
-
     safe_haven_terms = [
         "safe haven",
         "risk-off",
         "risk off",
         "geopolitical tensions",
         "geopolitical uncertainty",
+        "geopolitical risk",
         "war escalates",
         "conflict escalates",
         "military escalation",
+        "escalation in the middle east",
     ]
 
-    if any(
-        term in text
-        for term in safe_haven_terms
-    ):
+    if _has_any(text, safe_haven_terms):
+        gold_score += 3
 
-        if gold == "NEUTRAL":
+    # --------------------------------------------------------
+    # RESULT HELPERS
+    # --------------------------------------------------------
+    def bias(score):
+        # Small signals remain neutral rather than pretending to be certain.
+        if score >= 2:
+            return "BULLISH"
+        if score <= -2:
+            return "BEARISH"
+        return "NEUTRAL"
+
+    gold = bias(gold_score)
+    usd = bias(usd_score)
+    yield_bias = bias(yield_score)
+    oil = bias(oil_score)
+
+    # --------------------------------------------------------
+    # CAUSAL CONSISTENCY
+    # --------------------------------------------------------
+    # If direct USD/yield information is absent, infer the gold implication
+    # from the macro direction. Do not overwrite an explicit gold move.
+    if gold == "NEUTRAL":
+        if usd == "BULLISH" or yield_bias == "BULLISH":
+            gold = "BEARISH"
+        elif usd == "BEARISH" or yield_bias == "BEARISH":
             gold = "BULLISH"
 
     return {
