@@ -1526,8 +1526,8 @@ def direction_text(
 ):
 
     return {
-        "BULLISH": "🟢 Bullish",
-        "BEARISH": "🔴 Bearish",
+        "BULLISH": "📈 Bullish",
+        "BEARISH": "📉 Bearish",
         "NEUTRAL": "⚪ Neutral",
     }.get(
         direction,
