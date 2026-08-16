@@ -3,18 +3,13 @@ import html
 import logging
 import re
 import time
+from calendar import timegm
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 
 import feedparser
 import requests
 
-from config import NEWS_INTERVAL
-
-
-# ============================================================
-# LOGGER
-# ============================================================
 
 logger = logging.getLogger("KYSFX.NEWS")
 
@@ -24,12 +19,16 @@ logger = logging.getLogger("KYSFX.NEWS")
 # ============================================================
 
 REQUEST_TIMEOUT = 20
+TRANSLATION_TIMEOUT = 10
 
 MAX_NEWS_AGE_HOURS = 36
-
 MAX_RESULTS_PER_SOURCE = 30
 
-TRANSLATION_TIMEOUT = 10
+# Minimal score agar berita masuk engine
+MIN_RELEVANCE_SCORE = 10
+
+# Jumlah berita akhir
+DEFAULT_LIMIT = 10
 
 
 # ============================================================
@@ -37,244 +36,361 @@ TRANSLATION_TIMEOUT = 10
 # ============================================================
 
 NEWS_FEEDS = [
-
-    {
-        "name": "InvestingLive",
-        "url": "https://investinglive.com/rss/",
-        "priority": 10,
-    },
-
     {
         "name": "Google News - Gold",
         "url": (
             "https://news.google.com/rss/search?"
-            "q=gold+XAUUSD+when:2d"
-            "&hl=en-US"
-            "&gl=US"
-            "&ceid=US:en"
+            "q=gold+XAUUSD+gold+price+when:2d"
+            "&hl=en-US&gl=US&ceid=US:en"
         ),
-        "priority": 9,
+        "priority": 10,
     },
 
     {
-        "name": "Google News - USD Fed",
+        "name": "Google News - Fed USD",
         "url": (
             "https://news.google.com/rss/search?"
-            "q=USD+Federal+Reserve+Fed+when:2d"
-            "&hl=en-US"
-            "&gl=US"
-            "&ceid=US:en"
+            "q=Federal+Reserve+Fed+USD+dollar+"
+            "interest+rates+when:2d"
+            "&hl=en-US&gl=US&ceid=US:en"
         ),
-        "priority": 8,
+        "priority": 10,
     },
 
     {
         "name": "Google News - Treasury Yield",
         "url": (
             "https://news.google.com/rss/search?"
-            "q=US+Treasury+yield+when:2d"
-            "&hl=en-US"
-            "&gl=US"
-            "&ceid=US:en"
+            "q=US+Treasury+yields+10-year+yield+"
+            "real+yields+when:2d"
+            "&hl=en-US&gl=US&ceid=US:en"
         ),
-        "priority": 8,
-    },
-
-    {
-        "name": "Google News - Oil",
-        "url": (
-            "https://news.google.com/rss/search?"
-            "q=WTI+oil+OPEC+crude+when:2d"
-            "&hl=en-US"
-            "&gl=US"
-            "&ceid=US:en"
-        ),
-        "priority": 7,
+        "priority": 9,
     },
 
     {
         "name": "Google News - US Macro",
         "url": (
             "https://news.google.com/rss/search?"
-            "q=US+CPI+NFP+PCE+PPI+GDP+ISM+when:2d"
-            "&hl=en-US"
-            "&gl=US"
-            "&ceid=US:en"
+            "q=US+CPI+PCE+PPI+NFP+employment+"
+            "GDP+ISM+retail+sales+when:2d"
+            "&hl=en-US&gl=US&ceid=US:en"
         ),
-        "priority": 9,
+        "priority": 10,
+    },
+
+    {
+        "name": "Google News - Oil",
+        "url": (
+            "https://news.google.com/rss/search?"
+            "q=WTI+crude+oil+OPEC+oil+prices+when:2d"
+            "&hl=en-US&gl=US&ceid=US:en"
+        ),
+        "priority": 7,
     },
 
     {
         "name": "Google News - Geopolitics",
         "url": (
             "https://news.google.com/rss/search?"
-            "q=Middle+East+Iran+Israel+geopolitics+oil+gold+when:2d"
-            "&hl=en-US"
-            "&gl=US"
-            "&ceid=US:en"
+            "q=Iran+Israel+Middle+East+war+"
+            "geopolitics+gold+oil+when:2d"
+            "&hl=en-US&gl=US&ceid=US:en"
         ),
         "priority": 8,
+    },
+
+    {
+        "name": "InvestingLive",
+        "url": "https://investinglive.com/rss/",
+        "priority": 10,
     },
 ]
 
 
 # ============================================================
-# KEYWORDS
+# KEYWORD GROUPS
 # ============================================================
 
 GOLD_KEYWORDS = {
     "gold": 5,
-    "xau": 6,
-    "xauusd": 7,
+    "xau": 7,
+    "xauusd": 9,
     "bullion": 4,
-    "precious metal": 3,
-    "precious metals": 3,
-    "gold price": 6,
-    "gold prices": 6,
-    "gold futures": 6,
-    "spot gold": 6,
-    "safe haven": 3,
+    "gold price": 8,
+    "gold prices": 8,
+    "gold futures": 7,
+    "spot gold": 8,
+    "precious metals": 4,
+    "precious metal": 4,
+    "safe haven": 4,
 }
 
 
 USD_KEYWORDS = {
-    "usd": 4,
-    "u.s. dollar": 5,
-    "us dollar": 5,
-    "dollar index": 6,
-    "dxy": 6,
-    "greenback": 4,
+    "usd": 5,
+    "us dollar": 6,
+    "u.s. dollar": 6,
+    "dollar index": 8,
+    "dxy": 8,
+    "greenback": 5,
     "dollar": 2,
 }
 
 
 YIELD_KEYWORDS = {
-    "treasury yield": 6,
-    "treasury yields": 6,
-    "bond yield": 5,
-    "bond yields": 5,
-    "10-year yield": 7,
-    "10 year yield": 7,
-    "10-year treasury": 6,
-    "10 year treasury": 6,
-    "2-year yield": 5,
-    "real yield": 7,
+    "treasury yield": 8,
+    "treasury yields": 8,
+    "10-year yield": 9,
+    "10 year yield": 9,
+    "10-year treasury": 8,
+    "10 year treasury": 8,
+    "real yield": 9,
+    "real yields": 9,
+    "bond yield": 6,
+    "bond yields": 6,
     "yields": 3,
 }
 
 
 FED_KEYWORDS = {
-    "federal reserve": 7,
-    "fed": 5,
-    "fomc": 8,
-    "powell": 8,
-    "fed chair": 7,
-    "interest rate": 4,
-    "rate cut": 5,
-    "rate hike": 5,
-    "rate decision": 6,
-    "monetary policy": 5,
+    "federal reserve": 9,
+    "fed": 4,
+    "fomc": 12,
+    "powell": 11,
+    "fed chair": 10,
+    "interest rate": 5,
+    "interest rates": 5,
+    "rate cut": 8,
+    "rate cuts": 8,
+    "rate hike": 8,
+    "rate hikes": 8,
+    "rate decision": 10,
+    "monetary policy": 7,
 }
 
 
 INFLATION_KEYWORDS = {
-    "cpi": 8,
-    "core cpi": 8,
-    "pce": 8,
-    "core pce": 8,
-    "ppi": 7,
-    "inflation": 6,
-    "consumer prices": 6,
-    "producer prices": 6,
+    "cpi": 12,
+    "core cpi": 12,
+    "pce": 12,
+    "core pce": 12,
+    "ppi": 10,
+    "inflation": 8,
+    "consumer prices": 8,
+    "producer prices": 8,
 }
 
 
 LABOR_KEYWORDS = {
-    "nonfarm payrolls": 9,
-    "non-farm payrolls": 9,
-    "nfp": 9,
-    "payrolls": 8,
-    "jobs report": 8,
+    "nonfarm payrolls": 14,
+    "non-farm payrolls": 14,
+    "nfp": 14,
+    "payrolls": 10,
+    "jobs report": 11,
+    "employment report": 10,
     "employment": 5,
-    "unemployment": 6,
-    "jobless claims": 7,
-    "initial claims": 7,
-    "continuing claims": 6,
-    "jolts": 7,
-    "wages": 5,
-    "average hourly earnings": 7,
+    "unemployment": 8,
+    "unemployment rate": 10,
+    "jobless claims": 10,
+    "initial claims": 10,
+    "continuing claims": 8,
+    "jolts": 9,
+    "wages": 6,
+    "average hourly earnings": 10,
 }
 
 
 MACRO_KEYWORDS = {
-    "gdp": 7,
-    "ism": 7,
-    "pmi": 6,
-    "retail sales": 7,
-    "consumer confidence": 5,
-    "consumer sentiment": 5,
-    "durable goods": 5,
-    "industrial production": 5,
+    "gdp": 10,
+    "ism": 9,
+    "pmi": 7,
+    "retail sales": 10,
+    "consumer confidence": 7,
+    "consumer sentiment": 7,
+    "durable goods": 7,
+    "industrial production": 7,
     "manufacturing": 4,
-    "services": 3,
 }
 
 
 OIL_KEYWORDS = {
-    "oil": 3,
-    "crude oil": 6,
-    "wti": 7,
-    "brent": 5,
-    "opec": 7,
-    "opec+": 8,
-    "oil prices": 6,
-    "crude prices": 6,
-    "oil inventories": 7,
-    "eia": 7,
-    "strategic petroleum reserve": 6,
+    "crude oil": 8,
+    "wti": 10,
+    "brent": 7,
+    "opec": 9,
+    "opec+": 11,
+    "oil prices": 8,
+    "crude prices": 8,
+    "oil inventories": 10,
+    "eia": 9,
+    "strategic petroleum reserve": 8,
 }
 
 
 GEOPOLITICAL_KEYWORDS = {
-    "iran": 6,
-    "israel": 4,
-    "gaza": 4,
-    "middle east": 6,
-    "war": 4,
-    "conflict": 4,
-    "ceasefire": 5,
-    "sanctions": 5,
-    "missile": 5,
-    "military": 4,
-    "hormuz": 8,
-    "strait of hormuz": 9,
-    "red sea": 6,
-    "ukraine": 4,
-    "russia": 4,
+    "iran": 7,
+    "israel": 5,
+    "gaza": 5,
+    "middle east": 8,
+    "war": 5,
+    "conflict": 5,
+    "ceasefire": 6,
+    "sanctions": 6,
+    "missile": 6,
+    "military": 5,
+    "hormuz": 12,
+    "strait of hormuz": 14,
+    "red sea": 8,
+    "ukraine": 5,
+    "russia": 5,
 }
 
 
 HIGH_IMPACT_KEYWORDS = {
-    "fomc": 10,
-    "fed decision": 10,
-    "interest rate decision": 10,
-    "rate decision": 9,
-    "nfp": 10,
-    "nonfarm payrolls": 10,
-    "non-farm payrolls": 10,
-    "cpi": 10,
-    "pce": 10,
-    "core pce": 10,
-    "ppi": 8,
-    "powell": 9,
-    "federal reserve": 8,
-    "inflation": 6,
-    "jobless claims": 7,
-    "retail sales": 7,
-    "gdp": 7,
-    "opec+": 8,
-    "hormuz": 9,
+    "fomc": 15,
+    "fed decision": 15,
+    "interest rate decision": 15,
+    "rate decision": 13,
+    "nfp": 15,
+    "nonfarm payrolls": 15,
+    "non-farm payrolls": 15,
+    "cpi": 15,
+    "pce": 15,
+    "core pce": 15,
+    "ppi": 12,
+    "powell": 13,
+    "federal reserve": 10,
+    "jobless claims": 10,
+    "retail sales": 9,
+    "gdp": 9,
+    "opec+": 12,
+    "hormuz": 13,
+    "strait of hormuz": 15,
 }
+
+
+# ============================================================
+# DIRECTION KEYWORDS
+# ============================================================
+
+USD_BULLISH = [
+    "dollar rises",
+    "dollar rose",
+    "dollar gains",
+    "dollar gained",
+    "dollar strengthens",
+    "dollar strengthened",
+    "usd rises",
+    "usd gains",
+    "dxy rises",
+    "dxy gains",
+    "dollar climbs",
+    "dollar climbed",
+    "dollar jumps",
+    "dollar jumped",
+]
+
+
+USD_BEARISH = [
+    "dollar falls",
+    "dollar fell",
+    "dollar drops",
+    "dollar declined",
+    "dollar weakens",
+    "dollar weakened",
+    "usd falls",
+    "usd drops",
+    "dxy falls",
+    "dxy drops",
+    "dollar slips",
+    "dollar slipped",
+]
+
+
+YIELD_BULLISH = [
+    "yields rise",
+    "yields rose",
+    "yield rises",
+    "yield rose",
+    "yields climb",
+    "yield climbs",
+    "yields higher",
+    "yield higher",
+    "yields jump",
+    "yield jumps",
+]
+
+
+YIELD_BEARISH = [
+    "yields fall",
+    "yields fell",
+    "yield falls",
+    "yield fell",
+    "yields decline",
+    "yield declines",
+    "yields lower",
+    "yield lower",
+    "yields drop",
+    "yield drops",
+]
+
+
+OIL_BULLISH = [
+    "oil rises",
+    "oil rose",
+    "oil gains",
+    "oil gained",
+    "oil prices rise",
+    "oil prices rose",
+    "crude rises",
+    "crude rose",
+    "wti rises",
+    "wti rose",
+]
+
+
+OIL_BEARISH = [
+    "oil falls",
+    "oil fell",
+    "oil drops",
+    "oil declined",
+    "oil prices fall",
+    "oil prices fell",
+    "crude falls",
+    "crude fell",
+    "wti falls",
+    "wti fell",
+]
+
+
+HAWKISH_TERMS = [
+    "hawkish",
+    "higher for longer",
+    "rate hike",
+    "rate hikes",
+    "raise rates",
+    "raises rates",
+    "raising rates",
+    "tightening",
+    "higher rates",
+    "restrictive policy",
+    "restrictive monetary",
+]
+
+
+DOVISH_TERMS = [
+    "dovish",
+    "rate cut",
+    "rate cuts",
+    "cut rates",
+    "cuts rates",
+    "cutting rates",
+    "easing",
+    "lower rates",
+    "accommodative",
+    "monetary easing",
+]
 
 
 # ============================================================
@@ -300,48 +416,29 @@ BLOCKED_TITLE_KEYWORDS = [
 # CATEGORY
 # ============================================================
 
-CATEGORY_KEYWORDS = {
+def detect_category(matches):
 
-    "Bank Sentral": (
-        FED_KEYWORDS
-    ),
+    priority = [
+        ("Geopolitik", "geopolitics"),
+        ("Bank Sentral", "fed"),
+        ("Inflasi", "inflation"),
+        ("Tenaga Kerja", "labor"),
+        ("Energi", "oil"),
+        ("Yield", "yield"),
+        ("USD", "usd"),
+        ("Gold", "gold"),
+        ("Ekonomi AS", "macro"),
+    ]
 
-    "Inflasi": (
-        INFLATION_KEYWORDS
-    ),
+    for category, group in priority:
+        if matches.get(group):
+            return category
 
-    "Tenaga Kerja": (
-        LABOR_KEYWORDS
-    ),
-
-    "Ekonomi AS": (
-        MACRO_KEYWORDS
-    ),
-
-    "Energi": (
-        OIL_KEYWORDS
-    ),
-
-    "Geopolitik": (
-        GEOPOLITICAL_KEYWORDS
-    ),
-
-    "USD": (
-        USD_KEYWORDS
-    ),
-
-    "Yield": (
-        YIELD_KEYWORDS
-    ),
-
-    "Gold": (
-        GOLD_KEYWORDS
-    ),
-}
+    return "Market"
 
 
 # ============================================================
-# TEXT NORMALIZATION
+# NORMALIZE
 # ============================================================
 
 def normalize_text(value):
@@ -367,7 +464,7 @@ def normalize_text(value):
 
 
 # ============================================================
-# DATETIME PARSER
+# DATE
 # ============================================================
 
 def parse_entry_datetime(entry):
@@ -401,7 +498,6 @@ def parse_entry_datetime(entry):
         except Exception:
             pass
 
-    # Feedparser fallback
     for field in (
         "published_parsed",
         "updated_parsed",
@@ -413,25 +509,19 @@ def parse_entry_datetime(entry):
 
             try:
 
-                from calendar import timegm
-
-                timestamp = timegm(value)
-
                 return datetime.fromtimestamp(
-                    timestamp,
+                    timegm(value),
                     tz=timezone.utc,
                 )
 
             except Exception:
                 pass
 
-    return datetime.now(
-        timezone.utc
-    )
+    return datetime.now(timezone.utc)
 
 
 # ============================================================
-# FETCH FEED
+# FEED FETCH
 # ============================================================
 
 def fetch_feed(source):
@@ -452,7 +542,7 @@ def fetch_feed(source):
             headers={
                 "User-Agent": (
                     "Mozilla/5.0 "
-                    "(compatible; KYSFX-NewsBot/1.0)"
+                    "(compatible; KYSFX-NewsBot/2.0)"
                 )
             },
         )
@@ -490,151 +580,174 @@ def fetch_feed(source):
 # KEYWORD SCORE
 # ============================================================
 
-def keyword_score(
-    text,
-    keywords,
-):
+def keyword_score(text, keywords):
 
     score = 0
     matched = []
 
-    normalized = text.lower()
+    text = text.lower()
 
     for keyword, weight in keywords.items():
 
-        if keyword.lower() in normalized:
+        if keyword.lower() in text:
 
             score += weight
-
-            matched.append(
-                keyword
-            )
+            matched.append(keyword)
 
     return score, matched
 
 
 # ============================================================
-# ANALYZE RELEVANCE
+# RELEVANCE ENGINE V2
 # ============================================================
 
-def analyze_relevance(
-    title,
-    summary,
-):
+def analyze_relevance(title, summary):
 
     text = (
         f"{title} {summary}"
     ).lower()
 
-    total_score = 0
-
-    matches = {
-        "gold": [],
-        "usd": [],
-        "yield": [],
-        "fed": [],
-        "inflation": [],
-        "labor": [],
-        "macro": [],
-        "oil": [],
-        "geopolitics": [],
-        "high_impact": [],
+    groups = {
+        "gold": GOLD_KEYWORDS,
+        "usd": USD_KEYWORDS,
+        "yield": YIELD_KEYWORDS,
+        "fed": FED_KEYWORDS,
+        "inflation": INFLATION_KEYWORDS,
+        "labor": LABOR_KEYWORDS,
+        "macro": MACRO_KEYWORDS,
+        "oil": OIL_KEYWORDS,
+        "geopolitics": GEOPOLITICAL_KEYWORDS,
+        "high_impact": HIGH_IMPACT_KEYWORDS,
     }
 
-    # Gold
-    score, found = keyword_score(
-        text,
-        GOLD_KEYWORDS,
-    )
+    scores = {}
+    matches = {}
 
-    total_score += score
-    matches["gold"] = found
+    for name, keywords in groups.items():
 
-    # USD
-    score, found = keyword_score(
-        text,
-        USD_KEYWORDS,
-    )
+        score, found = keyword_score(
+            text,
+            keywords,
+        )
 
-    total_score += score
-    matches["usd"] = found
-
-    # Yield
-    score, found = keyword_score(
-        text,
-        YIELD_KEYWORDS,
-    )
-
-    total_score += score
-    matches["yield"] = found
-
-    # Fed
-    score, found = keyword_score(
-        text,
-        FED_KEYWORDS,
-    )
-
-    total_score += score
-    matches["fed"] = found
-
-    # Inflation
-    score, found = keyword_score(
-        text,
-        INFLATION_KEYWORDS,
-    )
-
-    total_score += score
-    matches["inflation"] = found
-
-    # Labor
-    score, found = keyword_score(
-        text,
-        LABOR_KEYWORDS,
-    )
-
-    total_score += score
-    matches["labor"] = found
-
-    # Macro
-    score, found = keyword_score(
-        text,
-        MACRO_KEYWORDS,
-    )
-
-    total_score += score
-    matches["macro"] = found
-
-    # Oil
-    score, found = keyword_score(
-        text,
-        OIL_KEYWORDS,
-    )
-
-    total_score += score
-    matches["oil"] = found
-
-    # Geopolitics
-    score, found = keyword_score(
-        text,
-        GEOPOLITICAL_KEYWORDS,
-    )
-
-    total_score += score
-    matches["geopolitics"] = found
-
-    # High impact
-    high_score, high_found = keyword_score(
-        text,
-        HIGH_IMPACT_KEYWORDS,
-    )
-
-    total_score += high_score
-    matches["high_impact"] = high_found
+        scores[name] = score
+        matches[name] = found
 
     # --------------------------------------------------------
-    # IMPORTANT:
-    # Prevent generic "dollar" / "oil" articles from
-    # being classified as strong XAUUSD news.
+    # BASE SCORE
+    # --------------------------------------------------------
+
+    score = sum(
+        scores[group]
+        for group in (
+            "gold",
+            "usd",
+            "yield",
+            "fed",
+            "inflation",
+            "labor",
+            "macro",
+            "oil",
+            "geopolitics",
+        )
+    )
+
+    # --------------------------------------------------------
+    # HIGH IMPACT BONUS
+    # --------------------------------------------------------
+
+    score += scores["high_impact"]
+
+    # --------------------------------------------------------
+    # CROSS-MARKET BONUS
+    #
+    # Gold + USD
+    # Gold + Yield
+    # Gold + Fed
+    # Gold + Inflation
+    # Gold + Labor
+    # --------------------------------------------------------
+
+    if matches["gold"]:
+
+        if matches["usd"]:
+            score += 8
+
+        if matches["yield"]:
+            score += 10
+
+        if matches["fed"]:
+            score += 10
+
+        if matches["inflation"]:
+            score += 10
+
+        if matches["labor"]:
+            score += 10
+
+        if matches["macro"]:
+            score += 6
+
+        if matches["geopolitics"]:
+            score += 7
+
+    # --------------------------------------------------------
+    # FED + USD / YIELD
+    # --------------------------------------------------------
+
+    if matches["fed"]:
+
+        if matches["usd"]:
+            score += 7
+
+        if matches["yield"]:
+            score += 8
+
+    # --------------------------------------------------------
+    # INFLATION + USD / YIELD
+    # --------------------------------------------------------
+
+    if matches["inflation"]:
+
+        if matches["usd"]:
+            score += 7
+
+        if matches["yield"]:
+            score += 8
+
+    # --------------------------------------------------------
+    # LABOR + USD / YIELD
+    # --------------------------------------------------------
+
+    if matches["labor"]:
+
+        if matches["usd"]:
+            score += 7
+
+        if matches["yield"]:
+            score += 8
+
+    # --------------------------------------------------------
+    # GEOPOLITICS + GOLD / OIL
+    # --------------------------------------------------------
+
+    if matches["geopolitics"]:
+
+        if matches["gold"]:
+            score += 10
+
+        if matches["oil"]:
+            score += 7
+
+    # --------------------------------------------------------
+    # OIL + GOLD
+    # --------------------------------------------------------
+
+    if matches["oil"] and matches["gold"]:
+        score += 5
+
+    # --------------------------------------------------------
+    # MARKET GROUP COUNT
     # --------------------------------------------------------
 
     market_groups = sum(
@@ -652,47 +765,85 @@ def analyze_relevance(
         )
     )
 
-    relevant = (
-        total_score >= 8
-        and market_groups >= 1
-    )
+    # --------------------------------------------------------
+    # RELEVANCE RULE
+    # --------------------------------------------------------
 
-    # Very strong macro/high impact news
-    if high_score >= 8:
+    relevant = False
+
+    if score >= MIN_RELEVANCE_SCORE:
         relevant = True
 
+    # Single generic keyword is not enough
+    if market_groups == 1:
+
+        only_group = next(
+            (
+                group
+                for group in (
+                    "gold",
+                    "usd",
+                    "yield",
+                    "fed",
+                    "inflation",
+                    "labor",
+                    "macro",
+                    "oil",
+                    "geopolitics",
+                )
+                if matches[group]
+            ),
+            None,
+        )
+
+        # Require stronger score for isolated categories
+        if only_group in (
+            "usd",
+            "oil",
+            "macro",
+        ):
+
+            relevant = score >= 18
+
     return {
-        "score": total_score,
+        "score": score,
         "relevant": relevant,
         "matches": matches,
+        "scores": scores,
     }
 
 
 # ============================================================
-# IMPACT LEVEL
+# IMPACT
 # ============================================================
 
 def impact_level(score):
 
-    if score >= 30:
+    if score >= 60:
+        return (
+            "Critical Impact News",
+            "⭐⭐⭐⭐⭐",
+        )
+
+    if score >= 40:
         return (
             "High Impact News",
             "⭐⭐⭐⭐⭐",
         )
 
-    if score >= 20:
+    if score >= 28:
         return (
             "High Impact News",
             "⭐⭐⭐⭐",
         )
 
-    if score >= 12:
+    if score >= 18:
         return (
             "Medium-High Impact",
             "⭐⭐⭐",
         )
 
-    if score >= 8:
+    if score >= 10:
         return (
             "Market Impact",
             "⭐⭐",
@@ -705,70 +856,12 @@ def impact_level(score):
 
 
 # ============================================================
-# CATEGORY DETECTION
-# ============================================================
-
-def detect_category(
-    text,
-    matches,
-):
-
-    priority = [
-        (
-            "Geopolitik",
-            "geopolitics",
-        ),
-        (
-            "Bank Sentral",
-            "fed",
-        ),
-        (
-            "Inflasi",
-            "inflation",
-        ),
-        (
-            "Tenaga Kerja",
-            "labor",
-        ),
-        (
-            "Energi",
-            "oil",
-        ),
-        (
-            "Yield",
-            "yield",
-        ),
-        (
-            "USD",
-            "usd",
-        ),
-        (
-            "Gold",
-            "gold",
-        ),
-        (
-            "Ekonomi AS",
-            "macro",
-        ),
-    ]
-
-    for category, group in priority:
-
-        if matches.get(group):
-
-            return category
-
-    return "Market"
-
-
-# ============================================================
-# DIRECTIONAL ANALYSIS
+# DIRECTION ENGINE
 # ============================================================
 
 def directional_analysis(
     title,
     summary,
-    matches,
 ):
 
     text = (
@@ -781,45 +874,18 @@ def directional_analysis(
     oil = "NEUTRAL"
 
     # --------------------------------------------------------
-    # DOVISH / HAWKISH
+    # HAWKISH / DOVISH
     # --------------------------------------------------------
-
-    hawkish_terms = [
-        "hawkish",
-        "higher for longer",
-        "rate hike",
-        "rate hikes",
-        "raise rates",
-        "raises rates",
-        "tightening",
-        "higher rates",
-        "restrictive",
-    ]
-
-    dovish_terms = [
-        "dovish",
-        "rate cut",
-        "rate cuts",
-        "cut rates",
-        "cuts rates",
-        "easing",
-        "lower rates",
-        "accommodative",
-    ]
 
     hawkish = any(
         term in text
-        for term in hawkish_terms
+        for term in HAWKISH_TERMS
     )
 
     dovish = any(
         term in text
-        for term in dovish_terms
+        for term in DOVISH_TERMS
     )
-
-    # --------------------------------------------------------
-    # USD / YIELD / GOLD RELATION
-    # --------------------------------------------------------
 
     if hawkish and not dovish:
 
@@ -834,38 +900,12 @@ def directional_analysis(
         gold = "BULLISH"
 
     # --------------------------------------------------------
-    # EXPLICIT DOLLAR MOVEMENT
+    # USD
     # --------------------------------------------------------
-
-    dollar_up_terms = [
-        "dollar rises",
-        "dollar rose",
-        "dollar gains",
-        "dollar gained",
-        "dollar strengthens",
-        "dollar strengthened",
-        "usd rises",
-        "usd gains",
-        "dxy rises",
-        "dxy gains",
-    ]
-
-    dollar_down_terms = [
-        "dollar falls",
-        "dollar fell",
-        "dollar drops",
-        "dollar declined",
-        "dollar weakens",
-        "dollar weakened",
-        "usd falls",
-        "usd drops",
-        "dxy falls",
-        "dxy drops",
-    ]
 
     if any(
         term in text
-        for term in dollar_up_terms
+        for term in USD_BULLISH
     ):
 
         usd = "BULLISH"
@@ -875,7 +915,7 @@ def directional_analysis(
 
     elif any(
         term in text
-        for term in dollar_down_terms
+        for term in USD_BEARISH
     ):
 
         usd = "BEARISH"
@@ -884,34 +924,12 @@ def directional_analysis(
             gold = "BULLISH"
 
     # --------------------------------------------------------
-    # YIELD MOVEMENT
+    # YIELD
     # --------------------------------------------------------
-
-    yield_up_terms = [
-        "yields rise",
-        "yields rose",
-        "yield rises",
-        "yield rose",
-        "yields climb",
-        "yield climbs",
-        "yields higher",
-        "yield higher",
-    ]
-
-    yield_down_terms = [
-        "yields fall",
-        "yields fell",
-        "yield falls",
-        "yield fell",
-        "yields decline",
-        "yield declines",
-        "yields lower",
-        "yield lower",
-    ]
 
     if any(
         term in text
-        for term in yield_up_terms
+        for term in YIELD_BULLISH
     ):
 
         yield_bias = "BULLISH"
@@ -921,7 +939,7 @@ def directional_analysis(
 
     elif any(
         term in text
-        for term in yield_down_terms
+        for term in YIELD_BEARISH
     ):
 
         yield_bias = "BEARISH"
@@ -933,43 +951,42 @@ def directional_analysis(
     # OIL
     # --------------------------------------------------------
 
-    oil_up_terms = [
-        "oil rises",
-        "oil rose",
-        "oil gains",
-        "oil gained",
-        "oil prices rise",
-        "crude rises",
-        "crude rose",
-        "wti rises",
-        "wti rose",
-    ]
-
-    oil_down_terms = [
-        "oil falls",
-        "oil fell",
-        "oil drops",
-        "oil declined",
-        "oil prices fall",
-        "crude falls",
-        "crude fell",
-        "wti falls",
-        "wti fell",
-    ]
-
     if any(
         term in text
-        for term in oil_up_terms
+        for term in OIL_BULLISH
     ):
 
         oil = "BULLISH"
 
     elif any(
         term in text
-        for term in oil_down_terms
+        for term in OIL_BEARISH
     ):
 
         oil = "BEARISH"
+
+    # --------------------------------------------------------
+    # SAFE HAVEN
+    # --------------------------------------------------------
+
+    safe_haven_terms = [
+        "safe haven",
+        "risk-off",
+        "risk off",
+        "geopolitical tensions",
+        "geopolitical uncertainty",
+        "war escalates",
+        "conflict escalates",
+        "military escalation",
+    ]
+
+    if any(
+        term in text
+        for term in safe_haven_terms
+    ):
+
+        if gold == "NEUTRAL":
+            gold = "BULLISH"
 
     return {
         "gold": gold,
@@ -980,61 +997,54 @@ def directional_analysis(
 
 
 # ============================================================
-# TRANSLATION
+# SOURCE
 # ============================================================
 
-def translate_to_indonesian(
-    text,
+def detect_source(
+    entry,
+    fallback,
 ):
 
-    if not text:
+    source = entry.get("source")
+
+    if isinstance(source, dict):
+
+        name = source.get("title")
+
+        if name:
+            return normalize_text(name)
+
+    if isinstance(source, str):
+
+        return normalize_text(source)
+
+    return fallback
+
+
+# ============================================================
+# TITLE CLEANING
+# ============================================================
+
+def clean_title(title):
+
+    title = normalize_text(title)
+
+    if not title:
         return ""
 
-    try:
+    # Google News sometimes adds " - Source"
+    parts = title.split(" - ")
 
-        url = (
-            "https://translate.googleapis.com/"
-            "translate_a/single"
-        )
+    if len(parts) >= 2:
 
-        params = {
-            "client": "gtx",
-            "sl": "auto",
-            "tl": "id",
-            "dt": "t",
-            "q": text[:4500],
-        }
+        last = parts[-1].strip()
 
-        response = requests.get(
-            url,
-            params=params,
-            timeout=TRANSLATION_TIMEOUT,
-        )
+        if len(last) < 80:
+            title = " - ".join(
+                parts[:-1]
+            )
 
-        response.raise_for_status()
-
-        data = response.json()
-
-        translated = ""
-
-        for item in data[0]:
-
-            if item and item[0]:
-
-                translated += item[0]
-
-        return normalize_text(
-            translated
-        )
-
-    except Exception as exc:
-
-        logger.warning(
-            "[NEWS] Translation failed: %s",
-            exc,
-        )
-
-        return text
+    return title.strip()
 
 
 # ============================================================
@@ -1046,15 +1056,10 @@ def create_summary(
     summary,
 ):
 
-    summary = normalize_text(
-        summary
-    )
+    summary = normalize_text(summary)
 
     if not summary:
-
-        return normalize_text(
-            title
-        )
+        return title[:600]
 
     sentences = re.split(
         r"(?<=[.!?])\s+",
@@ -1062,14 +1067,13 @@ def create_summary(
     )
 
     sentences = [
-        sentence.strip()
-        for sentence in sentences
-        if sentence.strip()
+        x.strip()
+        for x in sentences
+        if x.strip()
     ]
 
     if not sentences:
-
-        return summary[:500]
+        return summary[:700]
 
     return " ".join(
         sentences[:3]
@@ -1086,74 +1090,14 @@ def make_news_id(
 ):
 
     raw = (
-        f"{normalize_text(title).lower()}"
-        f"|{normalize_text(url).lower()}"
+        normalize_text(title).lower()
+        + "|"
+        + normalize_text(url).lower()
     )
 
     return hashlib.sha256(
-        raw.encode(
-            "utf-8"
-        )
+        raw.encode("utf-8")
     ).hexdigest()[:24]
-
-
-# ============================================================
-# CLEAN TITLE
-# ============================================================
-
-def clean_title(title):
-
-    title = normalize_text(
-        title
-    )
-
-    # Remove common Google News suffix
-    title = re.sub(
-        r"\s+-\s+[^-]{2,80}$",
-        "",
-        title,
-    )
-
-    return title.strip()
-
-
-# ============================================================
-# SOURCE NAME
-# ============================================================
-
-def detect_source(
-    entry,
-    fallback,
-):
-
-    source = entry.get(
-        "source"
-    )
-
-    if isinstance(
-        source,
-        dict,
-    ):
-
-        name = source.get(
-            "title"
-        )
-
-        if name:
-            return normalize_text(
-                name
-            )
-
-    if isinstance(
-        source,
-        str,
-    ):
-
-        return normalize_text(
-            source
-        )
-
-    return fallback
 
 
 # ============================================================
@@ -1166,10 +1110,7 @@ def process_entry(
 ):
 
     title = clean_title(
-        entry.get(
-            "title",
-            "",
-        )
+        entry.get("title", "")
     )
 
     if not title:
@@ -1186,10 +1127,7 @@ def process_entry(
     )
 
     url = normalize_text(
-        entry.get(
-            "link",
-            "",
-        )
+        entry.get("link", "")
     )
 
     published = parse_entry_datetime(
@@ -1200,38 +1138,31 @@ def process_entry(
         timezone.utc
     )
 
-    age = (
-        now - published
-    )
+    age = now - published
+
+    # --------------------------------------------------------
+    # AGE FILTER
+    # --------------------------------------------------------
 
     if age > timedelta(
         hours=MAX_NEWS_AGE_HOURS
     ):
-
         return None
 
     if age < timedelta(
         minutes=-10
     ):
-
         return None
+
+    # --------------------------------------------------------
+    # BLOCKED TITLES
+    # --------------------------------------------------------
 
     title_lower = title.lower()
 
-    # --------------------------------------------------------
-    # BLOCK WEEKLY PREVIEWS
-    # --------------------------------------------------------
-
-    for blocked in (
-        BLOCKED_TITLE_KEYWORDS
-    ):
+    for blocked in BLOCKED_TITLE_KEYWORDS:
 
         if blocked in title_lower:
-
-            logger.debug(
-                "[NEWS] Blocked title: %s",
-                title,
-            )
 
             return None
 
@@ -1245,28 +1176,45 @@ def process_entry(
     )
 
     if not analysis["relevant"]:
-
         return None
 
+    # --------------------------------------------------------
+    # CATEGORY
+    # --------------------------------------------------------
+
     category = detect_category(
-        f"{title} {summary}",
-        analysis["matches"],
+        analysis["matches"]
     )
 
-    impact_text, stars = impact_level(
+    # --------------------------------------------------------
+    # IMPACT
+    # --------------------------------------------------------
+
+    impact, stars = impact_level(
         analysis["score"]
     )
+
+    # --------------------------------------------------------
+    # DIRECTION
+    # --------------------------------------------------------
 
     direction = directional_analysis(
         title,
         summary,
-        analysis["matches"],
     )
+
+    # --------------------------------------------------------
+    # SOURCE
+    # --------------------------------------------------------
 
     source_name = detect_source(
         entry,
         source,
     )
+
+    # --------------------------------------------------------
+    # ID
+    # --------------------------------------------------------
 
     news_id = make_news_id(
         title,
@@ -1281,7 +1229,7 @@ def process_entry(
         "source": source_name,
         "published": published,
         "score": analysis["score"],
-        "impact": impact_text,
+        "impact": impact,
         "stars": stars,
         "category": category,
         "matches": analysis["matches"],
@@ -1290,7 +1238,7 @@ def process_entry(
 
 
 # ============================================================
-# FETCH ALL NEWS
+# FETCH ALL
 # ============================================================
 
 def fetch_all_news():
@@ -1317,14 +1265,12 @@ def fetch_all_news():
                 )
 
                 if item:
-                    collected.append(
-                        item
-                    )
+                    collected.append(item)
 
             except Exception as exc:
 
                 logger.warning(
-                    "[NEWS] Entry processing error: %s",
+                    "[NEWS] Entry error: %s",
                     exc,
                 )
 
@@ -1332,73 +1278,121 @@ def fetch_all_news():
 
 
 # ============================================================
-# DEDUPLICATE
+# DEDUPLICATION V2
 # ============================================================
+
+def normalize_title_for_dedup(
+    title,
+):
+
+    title = title.lower()
+
+    title = re.sub(
+        r"[^a-z0-9]+",
+        " ",
+        title,
+    )
+
+    stopwords = {
+        "the",
+        "a",
+        "an",
+        "to",
+        "of",
+        "for",
+        "and",
+        "on",
+        "in",
+        "as",
+        "with",
+    }
+
+    words = [
+        word
+        for word in title.split()
+        if word not in stopwords
+    ]
+
+    return " ".join(words)
+
+
+def title_similarity(
+    title_a,
+    title_b,
+):
+
+    words_a = set(
+        normalize_title_for_dedup(
+            title_a
+        ).split()
+    )
+
+    words_b = set(
+        normalize_title_for_dedup(
+            title_b
+        ).split()
+    )
+
+    if not words_a or not words_b:
+        return 0
+
+    intersection = words_a & words_b
+    union = words_a | words_b
+
+    return len(intersection) / len(union)
+
 
 def deduplicate_news(
     news,
 ):
 
-    unique = {}
-    title_index = {}
+    unique = []
 
     for item in news:
 
-        news_id = item["id"]
+        duplicate = False
 
-        title_key = re.sub(
-            r"[^a-z0-9]+",
-            " ",
-            item["title"].lower(),
-        ).strip()
+        for existing in unique:
 
-        # Exact ID duplicate
-        if news_id in unique:
-            continue
+            # Same URL
+            if (
+                item["url"]
+                and existing["url"]
+                and item["url"]
+                == existing["url"]
+            ):
 
-        # Similar title duplicate
-        if title_key in title_index:
+                duplicate = True
+                break
 
-            existing_id = title_index[
-                title_key
-            ]
+            similarity = title_similarity(
+                item["title"],
+                existing["title"],
+            )
 
-            existing = unique[
-                existing_id
-            ]
+            if similarity >= 0.72:
 
-            # Keep higher scoring article
-            if item["score"] > existing["score"]:
+                duplicate = True
 
-                del unique[
-                    existing_id
-                ]
+                # Keep stronger result
+                if item["score"] > existing["score"]:
 
-                unique[news_id] = item
-                title_index[
-                    title_key
-                ] = news_id
+                    existing.clear()
+                    existing.update(item)
 
-            continue
+                break
 
-        unique[news_id] = item
+        if not duplicate:
+            unique.append(item)
 
-        title_index[
-            title_key
-        ] = news_id
-
-    return list(
-        unique.values()
-    )
+    return unique
 
 
 # ============================================================
 # SORT
 # ============================================================
 
-def sort_news(
-    news,
-):
+def sort_news(news):
 
     return sorted(
         news,
@@ -1415,7 +1409,7 @@ def sort_news(
 # ============================================================
 
 def get_news(
-    limit=15,
+    limit=DEFAULT_LIMIT,
 ):
 
     logger.info(
@@ -1455,8 +1449,97 @@ def get_news(
 
 
 # ============================================================
+# TRANSLATION
+# ============================================================
+
+def translate_to_indonesian(
+    text,
+):
+
+    if not text:
+        return ""
+
+    try:
+
+        response = requests.get(
+            "https://translate.googleapis.com/"
+            "translate_a/single",
+            params={
+                "client": "gtx",
+                "sl": "auto",
+                "tl": "id",
+                "dt": "t",
+                "q": text[:4500],
+            },
+            timeout=TRANSLATION_TIMEOUT,
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        result = ""
+
+        for item in data[0]:
+
+            if item and item[0]:
+                result += item[0]
+
+        return normalize_text(
+            result
+        )
+
+    except Exception as exc:
+
+        logger.warning(
+            "[NEWS] Translation failed: %s",
+            exc,
+        )
+
+        return text
+
+
+# ============================================================
 # TELEGRAM FORMATTER
 # ============================================================
+
+def direction_text(
+    direction,
+):
+
+    return {
+        "BULLISH": "🟢 Bullish",
+        "BEARISH": "🔴 Bearish",
+        "NEUTRAL": "⚪ Neutral",
+    }.get(
+        direction,
+        "⚪ Neutral",
+    )
+
+
+def gold_conclusion(
+    direction,
+):
+
+    if direction == "BULLISH":
+
+        return (
+            "Cenderung <b>BULLISH</b> untuk "
+            "XAUUSD berdasarkan faktor berita."
+        )
+
+    if direction == "BEARISH":
+
+        return (
+            "Cenderung <b>BEARISH</b> untuk "
+            "XAUUSD berdasarkan faktor berita."
+        )
+
+    return (
+        "Dampak terhadap XAUUSD "
+        "belum memiliki arah yang jelas."
+    )
+
 
 def format_news_message(
     item,
@@ -1464,130 +1547,71 @@ def format_news_message(
 ):
 
     title = item["title"]
-    summary = item["summary"]
+    summary = create_summary(
+        title,
+        item["summary"],
+    )
 
     if translate:
 
-        translated_title = (
-            translate_to_indonesian(
-                title
-            )
+        title = translate_to_indonesian(
+            title
         )
 
-        translated_summary = (
-            translate_to_indonesian(
-                create_summary(
-                    title,
-                    summary,
-                )
-            )
+        summary = translate_to_indonesian(
+            summary
         )
 
-    else:
-
-        translated_title = title
-        translated_summary = (
-            create_summary(
-                title,
-                summary,
-            )
-        )
-
-    direction = item[
-        "direction"
-    ]
+    direction = item["direction"]
 
     gold = direction["gold"]
     usd = direction["usd"]
     yield_bias = direction["yield"]
     oil = direction["oil"]
 
-    gold_text = {
-        "BULLISH": (
-            "Berpotensi mendukung Gold "
-            "jika USD/Yield melemah."
-        ),
-        "BEARISH": (
-            "Berpotensi menekan Gold "
-            "jika USD/Yield menguat."
-        ),
-        "NEUTRAL": (
-            "Dampak langsung belum jelas."
-        ),
-    }[gold]
-
-    usd_text = {
-        "BULLISH": (
-            "Berpotensi menguat."
-        ),
-        "BEARISH": (
-            "Berpotensi melemah."
-        ),
-        "NEUTRAL": (
-            "Arah USD belum jelas."
-        ),
-    }[usd]
-
-    yield_text = {
-        "BULLISH": (
-            "Yield berpotensi naik."
-        ),
-        "BEARISH": (
-            "Yield berpotensi turun."
-        ),
-        "NEUTRAL": (
-            "Arah yield belum jelas."
-        ),
-    }[yield_bias]
-
-    oil_text = {
-        "BULLISH": (
-            "Oil berpotensi menguat."
-        ),
-        "BEARISH": (
-            "Oil berpotensi melemah."
-        ),
-        "NEUTRAL": (
-            "Dampak Oil belum jelas."
-        ),
-    }[oil]
-
     message = (
         "🚨 <b>BREAKING NEWS</b>\n\n"
 
         f"📂 <b>{html.escape(item['category'])}</b>\n"
 
-        f"📰 <b>{html.escape(translated_title)}</b>\n\n"
+        f"📰 <b>{html.escape(title)}</b>\n\n"
 
         f"⚠️ <b>{html.escape(item['impact'])}</b> "
         f"{item['stars']}\n\n"
 
-        f"📝 {html.escape(translated_summary)}\n\n"
+        f"📝 {html.escape(summary)}\n\n"
 
         "🥇 <b>GOLD / XAUUSD</b>\n"
-        f"{gold_text}\n\n"
+        f"{direction_text(gold)}\n\n"
 
         "💵 <b>USD</b>\n"
-        f"{usd_text}\n\n"
+        f"{direction_text(usd)}\n\n"
 
-        "📈 <b>YIELD</b>\n"
-        f"{yield_text}\n\n"
+        "📈 <b>US YIELD</b>\n"
+        f"{direction_text(yield_bias)}\n\n"
 
         "🛢️ <b>OIL / WTI</b>\n"
-        f"{oil_text}\n\n"
+        f"{direction_text(oil)}\n\n"
+
+        "🧠 <b>KESIMPULAN</b>\n"
+        f"{gold_conclusion(gold)}\n\n"
+
+        f"📊 <b>News Score:</b> "
+        f"{item['score']}\n"
 
         f"📰 <b>Sumber:</b> "
         f"{html.escape(item['source'])}\n"
 
-        f"🔗 <a href=\"{html.escape(item['url'])}\">"
-        "Baca berita</a>"
+        f"🔗 <a href=\""
+        f"{html.escape(item['url'])}"
+        f"\">Baca berita</a>"
     )
 
     return message
 
 
 # ============================================================
-# TEST
+# DEBUG TEST
 # ============================================================
 
 if __name__ == "__main__":
@@ -1607,11 +1631,11 @@ if __name__ == "__main__":
     )
 
     print()
-    print("=" * 70)
+    print("=" * 80)
     print(
-        f"RELEVANT NEWS: {len(results)}"
+        f"FINAL NEWS: {len(results)}"
     )
-    print("=" * 70)
+    print("=" * 80)
 
     for index, item in enumerate(
         results,
@@ -1624,43 +1648,39 @@ if __name__ == "__main__":
         )
 
         print(
-            f"   Category : {item['category']}"
+            f"   SCORE : {item['score']}"
         )
 
         print(
-            f"   Score    : {item['score']}"
-        )
-
-        print(
-            f"   Impact   : "
+            f"   IMPACT: "
             f"{item['impact']} "
             f"{item['stars']}"
         )
 
         print(
-            f"   Gold     : "
+            f"   GOLD  : "
             f"{item['direction']['gold']}"
         )
 
         print(
-            f"   USD      : "
+            f"   USD   : "
             f"{item['direction']['usd']}"
         )
 
         print(
-            f"   Yield    : "
+            f"   YIELD : "
             f"{item['direction']['yield']}"
         )
 
         print(
-            f"   Oil      : "
+            f"   OIL   : "
             f"{item['direction']['oil']}"
         )
 
         print(
-            f"   Source   : {item['source']}"
+            f"   SOURCE: {item['source']}"
         )
 
         print(
-            f"   URL      : {item['url']}"
+            f"   URL   : {item['url']}"
         )
