@@ -16,6 +16,8 @@ from config import (
     validate_config,
 )
 
+from state import state
+
 
 # ============================================================
 # LOGGING
@@ -38,7 +40,7 @@ logger = logging.getLogger("KYSFX")
 
 
 # ============================================================
-# COMMAND /START
+# /START
 # ============================================================
 
 async def start_command(
@@ -50,7 +52,7 @@ async def start_command(
 
     message = (
         "🤖 <b>KYSFX XAUUSD NEWS BOT</b>\n\n"
-        "Bot berhasil aktif.\n\n"
+        "Bot berhasil aktif. 🟢\n\n"
         f"🕐 WITA: "
         f"<code>{now:%d-%m-%Y %H:%M:%S}</code>\n\n"
         "Gunakan /help untuk melihat command."
@@ -61,9 +63,16 @@ async def start_command(
         parse_mode="HTML",
     )
 
+    logger.info(
+        "[TELEGRAM] /start from user=%s",
+        update.effective_user.id
+        if update.effective_user
+        else "unknown",
+    )
+
 
 # ============================================================
-# COMMAND /HELP
+# /HELP
 # ============================================================
 
 async def help_command(
@@ -72,37 +81,21 @@ async def help_command(
 ):
 
     message = (
-        "📚 <b>COMMAND BOT</b>\n\n"
+        "📚 <b>KYSFX BOT COMMAND</b>\n\n"
+
+        "🤖 <b>GENERAL</b>\n"
         "/start — Memulai bot\n"
         "/status — Status bot\n"
+        "/state — Database & memory bot\n"
         "/help — Daftar command\n\n"
-        "🚧 News, Calendar, Market Brief, "
-        "dan Session Engine sedang dibangun."
-    )
 
-    await update.message.reply_text(
-        message,
-        parse_mode="HTML",
-    )
+        "🚧 <b>COMING NEXT</b>\n"
+        "/news — Berita XAUUSD\n"
+        "/calendar — Economic Calendar\n"
+        "/brief — Market Brief\n"
+        "/session — Status session\n\n"
 
-
-# ============================================================
-# COMMAND /STATUS
-# ============================================================
-
-async def status_command(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-):
-
-    now = datetime.now(WITA)
-
-    message = (
-        "🟢 <b>BOT STATUS</b>\n\n"
-        f"Bot: <b>{BOT_NAME}</b>\n"
-        "Status: 🟢 ONLINE\n"
-        "Telegram: 🟢 CONNECTED\n"
-        f"WITA: <code>{now:%d-%m-%Y %H:%M:%S}</code>\n\n"
+        "📊 <b>ENGINE STATUS</b>\n"
         "News Engine: ⏳ BUILDING\n"
         "Calendar Engine: ⏳ BUILDING\n"
         "Market Engine: ⏳ BUILDING\n"
@@ -116,6 +109,123 @@ async def status_command(
 
 
 # ============================================================
+# /STATUS
+# ============================================================
+
+async def status_command(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+
+    now = datetime.now(WITA)
+
+    try:
+        total_records = state.total()
+        database_status = "🟢 OK"
+
+    except Exception as exc:
+
+        logger.error(
+            "[STATE] Database error: %s",
+            exc,
+            exc_info=True,
+        )
+
+        total_records = 0
+        database_status = "🔴 ERROR"
+
+    message = (
+        "🟢 <b>BOT STATUS</b>\n\n"
+
+        f"Bot: <b>{BOT_NAME}</b>\n"
+        "Telegram: 🟢 CONNECTED\n"
+        "Polling: 🟢 ACTIVE\n"
+        f"Database: {database_status}\n"
+        f"Records: <b>{total_records}</b>\n\n"
+
+        f"🕐 WITA:\n"
+        f"<code>{now:%d-%m-%Y %H:%M:%S}</code>\n\n"
+
+        "🚨 News Engine: ⏳ BUILDING\n"
+        "📅 Calendar Engine: ⏳ BUILDING\n"
+        "🧠 Market Engine: ⏳ BUILDING\n"
+        "🌏 Session Engine: ⏳ BUILDING"
+    )
+
+    await update.message.reply_text(
+        message,
+        parse_mode="HTML",
+    )
+
+
+# ============================================================
+# /STATE
+# ============================================================
+
+async def state_command(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+
+    try:
+
+        stats = state.stats()
+        total = state.total()
+
+        lines = [
+            "💾 <b>KYSFX BOT STATE</b>",
+            "",
+            "Database: 🟢 SQLite",
+            f"Total records: <b>{total}</b>",
+            "",
+        ]
+
+        if stats:
+
+            lines.append(
+                "📊 <b>RECORDS BY TYPE</b>"
+            )
+
+            for item_type, count in stats:
+
+                lines.append(
+                    f"• {item_type}: "
+                    f"<b>{count}</b>"
+                )
+
+        else:
+
+            lines.append(
+                "Belum ada data tersimpan."
+            )
+
+        await update.message.reply_text(
+            "\n".join(lines),
+            parse_mode="HTML",
+        )
+
+        logger.info(
+            "[STATE] /state requested | total=%s",
+            total,
+        )
+
+    except Exception as exc:
+
+        logger.error(
+            "[STATE] Failed to read state: %s",
+            exc,
+            exc_info=True,
+        )
+
+        await update.message.reply_text(
+            "🔴 <b>STATE ERROR</b>\n\n"
+            "Database tidak dapat dibaca.\n"
+            "Periksa log Railway.",
+            parse_mode="HTML",
+        )
+
+
+# ============================================================
 # ERROR HANDLER
 # ============================================================
 
@@ -124,11 +234,45 @@ async def error_handler(
     context: ContextTypes.DEFAULT_TYPE,
 ):
 
+    error = context.error
+
     logger.error(
-        "Telegram error: %s",
-        context.error,
-        exc_info=context.error,
+        "[TELEGRAM ERROR] %s",
+        error,
+        exc_info=error,
     )
+
+
+# ============================================================
+# DATABASE STARTUP TEST
+# ============================================================
+
+def test_database():
+
+    try:
+
+        total = state.total()
+
+        logger.info(
+            "[STATE] SQLite initialized successfully"
+        )
+
+        logger.info(
+            "[STATE] Existing records: %s",
+            total,
+        )
+
+        return True
+
+    except Exception as exc:
+
+        logger.error(
+            "[STATE] SQLite initialization failed: %s",
+            exc,
+            exc_info=True,
+        )
+
+        return False
 
 
 # ============================================================
@@ -155,23 +299,38 @@ def main():
     # --------------------------------------------------------
 
     try:
+
         validate_config()
 
     except Exception as exc:
 
         logger.critical(
-            "Configuration error: %s",
+            "[CONFIG] Configuration error: %s",
             exc,
         )
 
         raise
 
     logger.info(
-        "Configuration OK"
+        "[CONFIG] Configuration OK"
     )
 
     # --------------------------------------------------------
-    # APPLICATION
+    # DATABASE
+    # --------------------------------------------------------
+
+    if not test_database():
+
+        logger.critical(
+            "[STATE] Database test failed"
+        )
+
+        raise RuntimeError(
+            "SQLite database initialization failed"
+        )
+
+    # --------------------------------------------------------
+    # TELEGRAM APPLICATION
     # --------------------------------------------------------
 
     application = (
@@ -181,7 +340,7 @@ def main():
     )
 
     # --------------------------------------------------------
-    # COMMANDS
+    # COMMAND HANDLERS
     # --------------------------------------------------------
 
     application.add_handler(
@@ -205,16 +364,27 @@ def main():
         )
     )
 
+    application.add_handler(
+        CommandHandler(
+            "state",
+            state_command,
+        )
+    )
+
+    # --------------------------------------------------------
+    # ERROR HANDLER
+    # --------------------------------------------------------
+
     application.add_error_handler(
         error_handler
     )
 
     # --------------------------------------------------------
-    # START
+    # START POLLING
     # --------------------------------------------------------
 
     logger.info(
-        "Telegram polling starting..."
+        "[TELEGRAM] Polling starting..."
     )
 
     application.run_polling(
