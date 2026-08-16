@@ -1524,14 +1524,13 @@ def translate_to_indonesian(
 def direction_text(
     direction,
 ):
-
     return {
-        "BULLISH": "🟢 Bullish",
-        "BEARISH": "🔴 Bearish",
-        "NEUTRAL": "⚪ Neutral",
+        "BULLISH": "📈 Bullish",
+        "BEARISH": "📉 Bearish",
+        "NEUTRAL": "Neutral",
     }.get(
         direction,
-        "⚪ Neutral",
+        "Neutral",
     )
 
 
